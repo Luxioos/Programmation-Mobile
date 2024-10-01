@@ -3,3 +3,4 @@
 Membres : 
 Mathieu Duquenoy
 Lilian Chaptal
+Maxime Xu
