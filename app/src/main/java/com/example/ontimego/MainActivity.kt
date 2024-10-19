@@ -58,7 +58,7 @@ fun MainScreen() {
         }
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> AddTripScreen(modifier = Modifier.padding(innerPadding))
+            0 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding))
             1 -> ScheduleScreenPage(modifier = Modifier.padding(innerPadding))
             2 -> SettingsScreen(modifier = Modifier.padding(innerPadding))
         }
@@ -105,10 +105,7 @@ fun AppTopBar(title: String) {
     )
 }
 
-@Composable
-fun AddTripScreen(modifier: Modifier = Modifier) {
-    Text("Ajouter un trajet", modifier = modifier)
-}
+
 
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
