@@ -26,7 +26,7 @@ fun ScheduleScreenPage(modifier: Modifier = Modifier) { // Renamed function to a
             AppTopBar(title = "Emploi du temps")
         },
         bottomBar = {
-            NavigationBar(selectedTab = 1) { } // Menu de navigation
+            NavigationBar(selectedTab = 2) { } // Menu de navigation
         }
     ) {
         Box(modifier = modifier.padding(it)) {

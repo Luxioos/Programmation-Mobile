@@ -44,7 +44,7 @@ fun AddTripScreenPage(modifier: Modifier = Modifier) { // Renamed function to av
             AppTopBar(title = "Ajouter un trajet")
         },
         bottomBar = {
-            NavigationBar(selectedTab = 0) { } // Menu de navigation
+            NavigationBar(selectedTab = 1) { } // Menu de navigation
         }
     ) {
         Box(modifier = modifier.padding(it)) {
