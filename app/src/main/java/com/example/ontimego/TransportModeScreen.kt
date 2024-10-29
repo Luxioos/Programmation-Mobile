@@ -3,6 +3,7 @@ package com.example.ontimego
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -14,7 +15,7 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(text = "Salut $userName ! Comment te déplaces-tu le plus souvent ?")
 
@@ -25,7 +26,9 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
                     selected = (selectedMode == mode),
                     onClick = { selectedMode = mode }
                 )
-                Text(text = mode)
+                Text(
+                    text = mode,
+                    modifier = Modifier.align(Alignment.CenterVertically))
             }
         }
 
