@@ -27,6 +27,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        locationManager = LocationManager(this)
+        locationManager.checkLocationPermission()
+
         setContent {
             OnTimeGoTheme {
                 var currentScreen by remember { mutableStateOf(0) }
@@ -44,13 +48,10 @@ class MainActivity : ComponentActivity() {
                         // L'utilisateur peut passer à la page d'accueil ici
                         currentScreen = 3
                     }
-                    3 -> MainScreen() // La page d'accueil
+                    3 -> MainScreen(locationManager) // La page d'accueil
                 }
             }
         }
-
-        locationManager = LocationManager(this)
-        locationManager.checkLocationPermission()
 
     }
 
@@ -70,9 +71,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(locationManager: LocationManager) {
     var selectedTab by remember { mutableStateOf(0) }
-
+    var routes by remember { mutableStateOf<List<Route>>(emptyList()) }
     Scaffold(
         topBar = {
             AppTopBar(title = "OnTimeGo")
@@ -84,8 +85,12 @@ fun MainScreen() {
         }
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding))
-            1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding))
+            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding), locationManager = locationManager, routes = routes)
+            1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding),
+                locationManager = locationManager,
+                onRoutesFetched = { fetchedRoutes ->
+                    routes = fetchedRoutes
+                })
             2 -> ScheduleScreenPage(modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(modifier = Modifier.padding(innerPadding))
         }
@@ -166,10 +171,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     Text("Paramètres", modifier = modifier)
 }
 
-@Preview(showBackground = true)
+/*@Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
     OnTimeGoTheme {
         MainScreen()
     }
-}
+}*/

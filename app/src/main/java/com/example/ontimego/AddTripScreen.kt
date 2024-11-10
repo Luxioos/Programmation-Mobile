@@ -3,7 +3,6 @@ package com.example.ontimego
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,10 +36,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import java.util.Calendar
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTripScreenPage(modifier: Modifier = Modifier) { // Renamed function to avoid conflict
+fun AddTripScreenPage(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit, modifier: Modifier = Modifier) { // Renamed function to avoid conflict
     Scaffold(
         topBar = {
             AppTopBar(title = "Ajouter un trajet")
@@ -57,15 +59,85 @@ fun AddTripScreenPage(modifier: Modifier = Modifier) { // Renamed function to av
                     .padding(32.dp)
             ) {
 
-                TripSetter()
+                TripSetter(locationManager, onRoutesFetched)
         }
     }
 }
 
+data class Route(/*val polyline: String, */val distance: String, val duration: String)
+
+fun getRoutes(
+    originLat: Double,
+    originLng: Double,
+    destLat: Double,
+    destLng: Double,
+    onResult: (List<Route>) -> Unit
+) {
+    val client = OkHttpClient()
+    val url = "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&alternatives=true&key=CLE_API"
+
+    val request = Request.Builder().url(url).build()
+    client.newCall(request).execute().use { response ->
+        if (response.isSuccessful) {
+            /*val json = JSONObject(response.body?.string() ?: "")
+            val routes = json.getJSONArray("routes")
+            val routeList = mutableListOf<Route>()
+
+            if (routes.length() > 0) {
+                for (i in 0 until routes.length()) {
+                    val routeJson = routes.getJSONObject(i)
+                    val overviewPolyline = routeJson.getJSONObject("overview_polyline").getString("points")
+                    val legs = routeJson.getJSONArray("legs").getJSONObject(0)
+                    val distance = legs.getJSONObject("distance").getString("text")
+                    val duration = legs.getJSONObject("duration").getString("text")
+
+                    routeList.add(Route(overviewPolyline, distance, duration))
+                }
+                onResult(routeList)*/
+            val routeList = mutableListOf<Route>()
+            routeList.add(Route("1 m", "1 s"))
+            onResult(routeList)
+            //}
+            /*else {
+                onResult(emptyList())
+            }*/
+        }
+        else {
+            val routeList = mutableListOf<Route>()
+            routeList.add(Route("0 m", "0 s"))
+            onResult(routeList)
+            //onResult(emptyList())
+        }
+    }
+}
+
+fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
+    val client = OkHttpClient()
+    val url = "https://maps.googleapis.com/maps/api/geocode/json?address=${address.replace(" ", "+")}&key=CLE_API"
+
+    val request = Request.Builder().url(url).build()
+    client.newCall(request).execute().use { response ->
+        if (response.isSuccessful) {
+            /*val json = JSONObject(response.body?.string() ?: "")
+            val location = json.getJSONArray("results")
+                .getJSONObject(0)
+                .getJSONObject("geometry")
+                .getJSONObject("location")
+            val lat = location.getDouble("lat")
+            val lng = location.getDouble("lng")
+            onResult(lat, lng)*/
+            onResult(0.1, 0.1)
+        }
+        else {
+            onResult(null, null)
+        }
+    }
+
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TripSetter(){
+fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit) {
     val context = LocalContext.current
 
     val frequence = arrayOf("Unique","Journalier","Jour de la semaine","Week-end","Hebdomadaire")
@@ -229,7 +301,18 @@ fun TripSetter(){
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(onClick = {}) {
+            Button(onClick = {
+                locationManager.getCurrentLocation { originLat, originLng ->
+                    geocodeAddress(selectedAdresse) { destLat, destLng ->
+                        if (destLat != null && destLng != null) {
+                            getRoutes(originLat, originLng, destLat, destLng) { routes ->
+                                // envoyer les itinéraires à HomeScreen
+                                onRoutesFetched(routes)
+                            }
+                        }
+                    }
+                }
+            }) {
                 Text(text = "Ajouter un trajet")
             }
         }

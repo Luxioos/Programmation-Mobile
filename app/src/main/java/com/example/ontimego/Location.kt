@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Looper
 import android.widget.Toast
+import androidx.compose.runtime.Composable
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -63,7 +64,7 @@ class LocationManager(private val activity: Activity) {
                 for (location in locationResult.locations) {
                     val latitude = location.latitude
                     val longitude = location.longitude
-                    Toast.makeText(activity, "Latitude: $latitude, Longitude: $longitude", Toast.LENGTH_SHORT).show()
+                    //Toast.makeText(activity, "Latitude: $latitude, Longitude: $longitude", Toast.LENGTH_SHORT).show()
                 }
             }
         }
