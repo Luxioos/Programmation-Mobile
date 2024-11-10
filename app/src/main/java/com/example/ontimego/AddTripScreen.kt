@@ -39,10 +39,11 @@ import java.util.Calendar
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTripScreenPage(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit, modifier: Modifier = Modifier) { // Renamed function to avoid conflict
+fun AddTripScreenPage(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit,onEventAdded : (Event) -> Unit, modifier: Modifier = Modifier) { // Renamed function to avoid conflict
     Scaffold(
         topBar = {
             AppTopBar(title = "Ajouter un trajet")
@@ -59,7 +60,7 @@ fun AddTripScreenPage(locationManager: LocationManager, onRoutesFetched: (List<R
                     .padding(32.dp)
             ) {
 
-                TripSetter(locationManager, onRoutesFetched)
+                TripSetter(locationManager, onRoutesFetched,onEventAdded)
         }
     }
 }
@@ -137,7 +138,7 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit) {
+fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit,onEventAdded : (Event) -> Unit) {
     val context = LocalContext.current
 
     val frequence = arrayOf("Unique","Journalier","Jour de la semaine","Week-end","Hebdomadaire")
@@ -302,12 +303,29 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(onClick = {
+                val newEvent = Event(
+                    name = "Google I/O Keynote",
+                    color = Color(0xFFAFBBF2),
+                    start = LocalDateTime.parse("2021-05-18T09:00:00"),
+                    end = LocalDateTime.parse("2021-05-18T11:00:00"),
+                    description = "Tune in to find out about how we're furthering our mission to organize the world’s information and make it universally accessible and useful.",
+                )
+                onEventAdded(newEvent)
                 locationManager.getCurrentLocation { originLat, originLng ->
                     geocodeAddress(selectedAdresse) { destLat, destLng ->
                         if (destLat != null && destLng != null) {
                             getRoutes(originLat, originLng, destLat, destLng) { routes ->
                                 // envoyer les itinéraires à HomeScreen
                                 onRoutesFetched(routes)
+                                // rajoute le nouveau trajet aux évènements
+                                val newEvent = Event(
+                                    name = "Google I/O Keynote",
+                                    color = Color(0xFFAFBBF2),
+                                    start = LocalDateTime.parse("2021-05-18T09:00:00"),
+                                    end = LocalDateTime.parse("2021-05-18T11:00:00"),
+                                    description = "Tune in to find out about how we're furthering our mission to organize the world’s information and make it universally accessible and useful.",
+                                )
+                                onEventAdded(newEvent)
                             }
                         }
                     }

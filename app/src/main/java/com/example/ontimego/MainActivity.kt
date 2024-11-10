@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(locationManager: LocationManager) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) }
+    var events by remember { mutableStateOf(mutableListOf<Event>()) }
     Scaffold(
         topBar = {
             AppTopBar(title = "OnTimeGo")
@@ -90,12 +91,17 @@ fun MainScreen(locationManager: LocationManager) {
                 locationManager = locationManager,
                 onRoutesFetched = { fetchedRoutes ->
                     routes = fetchedRoutes
+                },
+                onEventAdded = { newEvent ->
+                    events.add(newEvent)
                 })
-            2 -> ScheduleScreenPage(modifier = Modifier.padding(innerPadding))
+
+            2 -> ScheduleScreenPage(eventList = events,modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(modifier = Modifier.padding(innerPadding))
         }
     }
 }
+
 
 @Composable
 fun NavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
