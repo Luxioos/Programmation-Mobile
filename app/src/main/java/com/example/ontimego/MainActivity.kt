@@ -1,5 +1,6 @@
 package com.example.ontimego
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,40 +30,53 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         locationManager = LocationManager(this)
-        locationManager.checkLocationPermission()
+        //locationManager.checkLocationPermission()
 
         setContent {
             OnTimeGoTheme {
                 var currentScreen by remember { mutableStateOf(0) }
+                var userName by remember { mutableStateOf("") }
+                var transportMode by remember { mutableStateOf("") }
+                var isSetupComplete by remember { mutableStateOf(false) }
 
-                when (currentScreen) {
-                    0 -> WelcomeScreen { name ->
-                        userName = name
-                        currentScreen = 1
+                fun updateUserSettings(newUserName: String, newTransportMode: String) {
+                    userName = newUserName
+                    transportMode = newTransportMode
+                }
+
+                if (!isSetupComplete) {
+                    when (currentScreen) {
+                        0 -> WelcomeScreen { name ->
+                            userName = name
+                            currentScreen = 1
+                        }
+                        1 -> TransportModeScreen(userName) { mode ->
+                            transportMode = mode
+                            isSetupComplete = true
+                        }
                     }
-                    1 -> TransportModeScreen(userName ?: "") { mode ->
-                        transportMode = mode
-                        currentScreen = 2
-                    }
-                    2 -> LocationPermissionScreen {
-                        // L'utilisateur peut passer à la page d'accueil ici
-                        currentScreen = 3
-                    }
-                    3 -> MainScreen(locationManager) // La page d'accueil
+                } else {
+                    MainScreen(
+                        locationManager = locationManager,
+                        userName = userName,
+                        transportMode = transportMode,
+                        onScreenChange = { currentScreen = it },
+                        onUpdateSettings = ::updateUserSettings
+                    )
                 }
             }
         }
 
     }
 
-    override fun onRequestPermissionsResult(
+    /*override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         locationManager.onRequestPermissionsResult(requestCode, grantResults)
-    }
+    }*/
 
     override fun onStop() {
         super.onStop()
@@ -71,10 +85,16 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(locationManager: LocationManager) {
+fun MainScreen(locationManager: LocationManager,
+               userName: String,
+               transportMode: String,
+               onScreenChange: (Int) -> Unit,
+               onUpdateSettings: (String, String) -> Unit
+) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) }
     var events by remember { mutableStateOf(mutableListOf<Event>()) }
+
     Scaffold(
         topBar = {
             AppTopBar(title = "OnTimeGo")
@@ -82,6 +102,7 @@ fun MainScreen(locationManager: LocationManager) {
         bottomBar = {
             NavigationBar(selectedTab) { tab ->
                 selectedTab = tab
+                onScreenChange(tab)
             }
         }
     ) { innerPadding ->
@@ -95,9 +116,13 @@ fun MainScreen(locationManager: LocationManager) {
                 onEventAdded = { newEvent ->
                     events.add(newEvent)
                 })
-
             2 -> ScheduleScreenPage(eventList = events,modifier = Modifier.padding(innerPadding))
-            3 -> SettingsScreen(modifier = Modifier.padding(innerPadding))
+            3 -> SettingsScreen(
+                modifier = Modifier.padding(innerPadding),
+                userName = userName,
+                transportMode = transportMode,
+                onSave = onUpdateSettings
+            )
         }
     }
 }
@@ -169,18 +194,3 @@ fun AppTopBar(title: String) {
         }
     )
 }
-
-
-
-@Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
-    Text("Paramètres", modifier = modifier)
-}
-
-/*@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    OnTimeGoTheme {
-        MainScreen()
-    }
-}*/

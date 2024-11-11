@@ -1,7 +1,10 @@
 package com.example.ontimego
 
 import android.app.TimePickerDialog
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,32 +39,77 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import java.util.Calendar
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.time.LocalDateTime
+import android.Manifest
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTripScreenPage(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit,onEventAdded : (Event) -> Unit, modifier: Modifier = Modifier) { // Renamed function to avoid conflict
+fun AddTripScreenPage(
+    locationManager: LocationManager,
+    onRoutesFetched: (List<Route>) -> Unit,
+    onEventAdded : (Event) -> Unit,
+    modifier: Modifier = Modifier
+) { // Renamed function to avoid conflict
+    val context = LocalContext.current
+    var hasLocationPermission by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasLocationPermission = isGranted
+        if (isGranted) {
+            Toast.makeText(context, "Accès à la localisation autorisé", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Accès à la localisation refusé", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            hasLocationPermission = true
+        }
+    }
+
     Scaffold(
         topBar = {
             AppTopBar(title = "Ajouter un trajet")
         },
         bottomBar = {
-            NavigationBar(selectedTab = 1) { } // Menu de navigation
+            NavigationBar(selectedTab = 1) { }
         }
-    ) {
-        Box(modifier = modifier.padding(it)) {
-        }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp)
-            ) {
+    ) { paddingValues ->
+        Box(modifier = modifier.fillMaxSize().padding(paddingValues)) {
+            LaunchedEffect(Unit) {
+                if (!permissionRequested) {
+                    permissionRequested = true
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    } else {
+                        hasLocationPermission = true
+                    }
+                }
+            }
 
-                TripSetter(locationManager, onRoutesFetched,onEventAdded)
+            if (hasLocationPermission) {
+                TripSetter(locationManager, onRoutesFetched, onEventAdded)
+            } else {
+                Text(
+                    text = "Autorisation de localisation requise pour ajouter un trajet.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                )
+            }
         }
     }
 }
@@ -164,7 +213,6 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
       modifier = Modifier.padding(16.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(36.dp))
             Text(text = "Sélectionner une date")
             OutlinedTextField(
                 value = selectedDate,
@@ -261,7 +309,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                     },
                     hour,
                     minute,
-                    true  // formay 24h
+                    true  // format 24h
                 ).show()
             }
 
@@ -300,7 +348,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(onClick = {
                 val newEvent = Event(
