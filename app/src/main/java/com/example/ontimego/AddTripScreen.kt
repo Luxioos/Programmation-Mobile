@@ -211,7 +211,6 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
             e.printStackTrace()
         }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
