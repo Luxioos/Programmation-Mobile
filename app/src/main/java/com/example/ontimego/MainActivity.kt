@@ -1,6 +1,5 @@
 package com.example.ontimego
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 
@@ -30,18 +28,32 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         locationManager = LocationManager(this)
-        //locationManager.checkLocationPermission()
 
         setContent {
             OnTimeGoTheme {
                 var currentScreen by remember { mutableStateOf(0) }
                 var userName by remember { mutableStateOf("") }
                 var transportMode by remember { mutableStateOf("") }
+                var userAddress by remember { mutableStateOf("") }
+                var userCity by remember { mutableStateOf("") }
+                var userPostalCode by remember { mutableStateOf("") }
+                var userCountry by remember { mutableStateOf("Canada") }
                 var isSetupComplete by remember { mutableStateOf(false) }
 
-                fun updateUserSettings(newUserName: String, newTransportMode: String) {
+                fun updateUserSettings(
+                    newUserName: String,
+                    newTransportMode: String,
+                    newAddress: String,
+                    newCity: String,
+                    newPostalCode: String,
+                    newCountry: String)
+                {
                     userName = newUserName
                     transportMode = newTransportMode
+                    userAddress = newAddress
+                    userCity = newCity
+                    userPostalCode = newPostalCode
+                    userCountry = newCountry
                 }
 
                 if (!isSetupComplete) {
@@ -60,6 +72,10 @@ class MainActivity : ComponentActivity() {
                         locationManager = locationManager,
                         userName = userName,
                         transportMode = transportMode,
+                        userAddress = userAddress,
+                        userCity = userCity,
+                        userPostalCode = userPostalCode,
+                        userCountry = userCountry,
                         onScreenChange = { currentScreen = it },
                         onUpdateSettings = ::updateUserSettings
                     )
@@ -68,16 +84,6 @@ class MainActivity : ComponentActivity() {
         }
 
     }
-
-    /*override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        locationManager.onRequestPermissionsResult(requestCode, grantResults)
-    }*/
-
     override fun onStop() {
         super.onStop()
         locationManager.stopLocationUpdates()
@@ -85,11 +91,16 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(locationManager: LocationManager,
-               userName: String,
-               transportMode: String,
-               onScreenChange: (Int) -> Unit,
-               onUpdateSettings: (String, String) -> Unit
+fun MainScreen(
+    locationManager: LocationManager,
+    userName: String,
+    transportMode: String,
+    userAddress: String,
+    userCity: String,
+    userPostalCode: String,
+    userCountry: String,
+    onScreenChange: (Int) -> Unit,
+    onUpdateSettings: (String, String, String, String, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) }
@@ -121,7 +132,20 @@ fun MainScreen(locationManager: LocationManager,
                 modifier = Modifier.padding(innerPadding),
                 userName = userName,
                 transportMode = transportMode,
-                onSave = onUpdateSettings
+                address = userAddress,
+                city = userCity,
+                postalCode = userPostalCode,
+                country = userCountry,
+                onSave = { name, mode, address, city, postalCode, country ->
+                    onUpdateSettings(
+                        name,
+                        mode,
+                        address,
+                        city,
+                        postalCode,
+                        country
+                    )
+                }
             )
         }
     }

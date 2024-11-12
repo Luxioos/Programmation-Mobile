@@ -46,9 +46,17 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.time.LocalDateTime
 import android.Manifest
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateListOf
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -201,18 +209,29 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
     var selectedDate by remember { mutableStateOf("") }
     var showCalendar by remember { mutableStateOf(false) }
 
-    var selectedAdresse by remember {mutableStateOf("")}
+    var selectedAdresse by remember { mutableStateOf("") }
+    var isAddressSelected by remember { mutableStateOf(false) }
+    var hasInteractedWithAddress by remember { mutableStateOf(false) }
+    val addressSuggestions = remember { mutableStateListOf<AddressSuggestion>() }
+
 
     var selectedTime by remember {mutableStateOf("")}
     var showTime by remember {mutableStateOf(false)}
 
     val scrollState = rememberScrollState()
 
+    LaunchedEffect(selectedAdresse, hasInteractedWithAddress) {
+        if (selectedAdresse.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
+            fetchAddressSuggestions(selectedAdresse) { suggestions ->
+                addressSuggestions.clear()
+                addressSuggestions.addAll(suggestions)
+            }
+        } else if (isAddressSelected) {
+            addressSuggestions.clear()
+        }
+    }
 
-    LazyColumn(
-      modifier = Modifier.padding(16.dp)
-    ) {
-        item {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(text = "Sélectionner une date")
             OutlinedTextField(
                 value = selectedDate,
@@ -272,14 +291,43 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
             Text("Adresse d'arrivée")
             OutlinedTextField(
                 value = selectedAdresse,
-                onValueChange = { selectedAdresse = it },
+                onValueChange = { query ->
+                    selectedAdresse = query
+                    isAddressSelected = false
+                    hasInteractedWithAddress = true
+                },
                 label = { Text("Adresse") },
-                modifier = Modifier,
+                modifier = Modifier.fillMaxWidth(),
             )
+
+        if (addressSuggestions.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+            ) {
+                items(addressSuggestions) { suggestion ->
+                    Text(
+                        text = suggestion.description,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedAdresse = suggestion.description
+                                isAddressSelected = true
+                                hasInteractedWithAddress = false
+                            }
+                            .padding(8.dp)
+                    )
+                }
+            }
+        }
+
             Spacer(modifier = Modifier.height(24.dp))
+
             Text("Heure")
             OutlinedTextField(
                 value = selectedTime,
@@ -384,6 +432,5 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
         }
 
     }
-}
 
 
