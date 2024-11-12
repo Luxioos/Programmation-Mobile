@@ -49,6 +49,9 @@ import android.Manifest
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,66 +126,83 @@ fun getRoutes(
     destLng: Double,
     onResult: (List<Route>) -> Unit
 ) {
-    val client = OkHttpClient()
-    val url = "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&alternatives=true&key=CLE_API"
+    CoroutineScope(Dispatchers.IO).launch {
 
-    val request = Request.Builder().url(url).build()
-    client.newCall(request).execute().use { response ->
-        if (response.isSuccessful) {
-            /*val json = JSONObject(response.body?.string() ?: "")
-            val routes = json.getJSONArray("routes")
-            val routeList = mutableListOf<Route>()
+        val client = OkHttpClient()
+        val url =
+            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&alternatives=true&key=cle_api"
 
-            if (routes.length() > 0) {
-                for (i in 0 until routes.length()) {
-                    val routeJson = routes.getJSONObject(i)
-                    val overviewPolyline = routeJson.getJSONObject("overview_polyline").getString("points")
-                    val legs = routeJson.getJSONArray("legs").getJSONObject(0)
-                    val distance = legs.getJSONObject("distance").getString("text")
-                    val duration = legs.getJSONObject("duration").getString("text")
+        val request = Request.Builder().url(url).build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val json = JSONObject(response.body?.string() ?: "")
+                    val routes = json.getJSONArray("routes")
+                    val routeList = mutableListOf<Route>()
 
-                    routeList.add(Route(overviewPolyline, distance, duration))
-                }
-                onResult(routeList)*/
-            val routeList = mutableListOf<Route>()
+                    if (routes.length() > 0) {
+                        for (i in 0 until routes.length()) {
+                            val routeJson = routes.getJSONObject(i)
+                            //val overviewPolyline = routeJson.getJSONObject("overview_polyline").getString("points")
+                            val legs = routeJson.getJSONArray("legs").getJSONObject(0)
+                            val distance = legs.getJSONObject("distance").getString("text")
+                            val duration = legs.getJSONObject("duration").getString("text")
+
+                            routeList.add(Route(/*overviewPolyline,*/distance, duration))
+                        }
+                        onResult(routeList)
+                        /*val routeList = mutableListOf<Route>()
             routeList.add(Route("1 m", "1 s"))
-            onResult(routeList)
-            //}
-            /*else {
-                onResult(emptyList())
-            }*/
-        }
-        else {
-            val routeList = mutableListOf<Route>()
+            onResult(routeList)*/
+                    } else {
+                        onResult(emptyList())
+                    }
+                } else {
+                    /*val routeList = mutableListOf<Route>()
             routeList.add(Route("0 m", "0 s"))
-            onResult(routeList)
-            //onResult(emptyList())
+            onResult(routeList)*/
+                    onResult(emptyList())
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
 
 fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
-    val client = OkHttpClient()
-    val url = "https://maps.googleapis.com/maps/api/geocode/json?address=${address.replace(" ", "+")}&key=CLE_API"
+    CoroutineScope(Dispatchers.IO).launch {
 
-    val request = Request.Builder().url(url).build()
-    client.newCall(request).execute().use { response ->
-        if (response.isSuccessful) {
-            /*val json = JSONObject(response.body?.string() ?: "")
-            val location = json.getJSONArray("results")
-                .getJSONObject(0)
-                .getJSONObject("geometry")
-                .getJSONObject("location")
-            val lat = location.getDouble("lat")
-            val lng = location.getDouble("lng")
-            onResult(lat, lng)*/
-            onResult(0.1, 0.1)
-        }
-        else {
-            onResult(null, null)
+        val client = OkHttpClient()
+        val url = "https://maps.googleapis.com/maps/api/geocode/json?address=${
+            address.replace(
+                " ",
+                "+"
+            )
+        }&key=cle_api"
+
+        val request = Request.Builder().url(url).build()
+        try {
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val json = JSONObject(response.body?.string() ?: "")
+                    val location = json.getJSONArray("results")
+                        .getJSONObject(0)
+                        .getJSONObject("geometry")
+                        .getJSONObject("location")
+                    val lat = location.getDouble("lat")
+                    val lng = location.getDouble("lng")
+                    onResult(lat, lng)
+                    //onResult(0.1, 0.1)
+                } else {
+                    onResult(null, null)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
