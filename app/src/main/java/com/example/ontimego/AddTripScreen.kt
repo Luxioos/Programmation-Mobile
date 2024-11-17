@@ -60,6 +60,9 @@ import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +103,9 @@ fun AddTripScreenPage(
             NavigationBar(selectedTab = 1) { }
         }
     ) { paddingValues ->
-        Box(modifier = modifier.fillMaxSize().padding(paddingValues)) {
+        Box(modifier = modifier
+            .fillMaxSize()
+            .padding(paddingValues)) {
             LaunchedEffect(Unit) {
                 if (!permissionRequested) {
                     permissionRequested = true
@@ -118,7 +123,9 @@ fun AddTripScreenPage(
                 Text(
                     text = "Autorisation de localisation requise pour ajouter un trajet.",
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
                 )
             }
         }
@@ -132,13 +139,15 @@ fun getRoutes(
     originLng: Double,
     destLat: Double,
     destLng: Double,
+    mode: String,
+    departureTime: Long,
     onResult: (List<Route>) -> Unit
 ) {
     CoroutineScope(Dispatchers.IO).launch {
 
         val client = OkHttpClient()
         val url =
-            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&alternatives=true&key=cle_api"
+            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&departure_time=$departureTime&key="
 
         val request = Request.Builder().url(url).build()
         try {
@@ -187,7 +196,7 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
                 " ",
                 "+"
             )
-        }&key=cle_api"
+        }&key="
 
         val request = Request.Builder().url(url).build()
         try {
@@ -251,7 +260,10 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+    LazyColumn(modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp)) {
+        item {
             Text(text = "Sélectionner une date")
             OutlinedTextField(
                 value = selectedDate,
@@ -323,27 +335,27 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                 modifier = Modifier.fillMaxWidth(),
             )
 
-        if (addressSuggestions.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 200.dp)
-            ) {
-                items(addressSuggestions) { suggestion ->
-                    Text(
-                        text = suggestion.description,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedAdresse = suggestion.description
-                                isAddressSelected = true
-                                hasInteractedWithAddress = false
-                            }
-                            .padding(8.dp)
-                    )
+            if (addressSuggestions.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                ) {
+                    items(addressSuggestions) { suggestion ->
+                        Text(
+                            text = suggestion.description,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedAdresse = suggestion.description
+                                    isAddressSelected = true
+                                    hasInteractedWithAddress = false
+                                }
+                                .padding(8.dp)
+                        )
+                    }
                 }
             }
-        }
 
             Spacer(modifier = Modifier.height(24.dp))
             Text("Heure")
@@ -428,7 +440,12 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                 locationManager.getCurrentLocation { originLat, originLng ->
                     geocodeAddress(selectedAdresse) { destLat, destLng ->
                         if (destLat != null && destLng != null) {
-                            getRoutes(originLat, originLng, destLat, destLng) { routes ->
+                            var mode: String
+                            if (selectedTransport == "Voiture") mode = "driving"
+                            else if (selectedTransport == "Marche") mode = "walking"
+                            else mode = "transit"
+                            val departureTime = convertToTimestamp(selectedDate, selectedTime)
+                            getRoutes(originLat, originLng, destLat, destLng, mode, departureTime) { routes ->
                                 // envoyer les itinéraires à HomeScreen
                                 onRoutesFetched(routes)
                                 // rajoute le nouveau trajet aux évènements
@@ -448,7 +465,25 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                 Text(text = "Ajouter un trajet")
             }
         }
+    }
 
     }
+
+fun convertToTimestamp(date: String, time: String): Long {
+    // Combiner date et heure en une seule chaîne
+    val dateTimeString = "$date $time"
+
+    // Adapter le format au type d'entrée
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+
+    // Définir le fuseau horaire local à l'utilisateur pour le timestamp
+    dateFormat.timeZone = TimeZone.getDefault()
+
+    // Convertir la chaîne en objet Date
+    val dateTime = dateFormat.parse(dateTimeString)
+
+    // Retourner le timestamp UNIX en secondes
+    return dateTime?.time?.div(1000) ?: throw IllegalArgumentException("Date ou heure invalide")
+}
 
 
