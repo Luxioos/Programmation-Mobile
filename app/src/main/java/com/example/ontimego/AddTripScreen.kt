@@ -147,7 +147,7 @@ fun getRoutes(
 
         val client = OkHttpClient()
         val url =
-            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&departure_time=$departureTime&key="
+            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&departure_time=$departureTime&alternatives=true&key="
 
         val request = Request.Builder().url(url).build()
         try {
@@ -168,16 +168,12 @@ fun getRoutes(
                             routeList.add(Route(/*overviewPolyline,*/distance, duration))
                         }
                         onResult(routeList)
-                        /*val routeList = mutableListOf<Route>()
-            routeList.add(Route("1 m", "1 s"))
-            onResult(routeList)*/
+
                     } else {
                         onResult(emptyList())
                     }
                 } else {
-                    /*val routeList = mutableListOf<Route>()
-            routeList.add(Route("0 m", "0 s"))
-            onResult(routeList)*/
+
                     onResult(emptyList())
                 }
             }
@@ -231,7 +227,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
     var selectedFrequency by remember { mutableStateOf(frequence[0]) }
     var expandedFrequency by remember { mutableStateOf(false) }
 
-    val transport = arrayOf("Voiture","Bus","Metro","Marche")
+    val transport = arrayOf("Voiture","Transport en commun","Marche")
     var selectedTransport by remember {mutableStateOf(transport[0])}
     var expandedTransport by remember {mutableStateOf(false)}
 

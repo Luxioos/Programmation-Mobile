@@ -118,11 +118,12 @@ fun MainScreen(
         }
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding), locationManager = locationManager, routes = routes)
+            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding))
             1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding),
                 locationManager = locationManager,
                 onRoutesFetched = { fetchedRoutes ->
                     routes = fetchedRoutes
+                    selectedTab = 4
                 },
                 onEventAdded = { newEvent ->
                     events.add(newEvent)
@@ -147,6 +148,7 @@ fun MainScreen(
                     )
                 }
             )
+            4 -> ListItineraires(routes = routes, modifier = Modifier.padding(16.dp))
         }
     }
 }

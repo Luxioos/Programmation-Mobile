@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun HomeScreenPage(locationManager: LocationManager, routes: List<Route>, modifier: Modifier = Modifier) {
+fun HomeScreenPage(modifier: Modifier = Modifier) {
     Scaffold(
         topBar = {
             AppTopBar(title = "Accueil")
@@ -41,25 +41,14 @@ fun HomeScreenPage(locationManager: LocationManager, routes: List<Route>, modifi
         }
     ) {
         Box(modifier = modifier.padding(it)) {
-            HomeContent(locationManager, routes)
+            HomeContent()
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(locationManager: LocationManager, routes: List<Route>) {
-
-    /* //Obtenir la latitude et la longitude
-    var latitude by remember { mutableStateOf<Double?>(null) }
-    var longitude by remember { mutableStateOf<Double?>(null) }
-    LaunchedEffect(Unit) {
-        locationManager.getCurrentLocation { lat, lon ->
-            latitude = lat
-            longitude = lon
-        }
-    }*/
-    if (routes.isEmpty()) {
+fun HomeContent() {
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -105,37 +94,5 @@ fun HomeContent(locationManager: LocationManager, routes: List<Route>) {
                 }
             }
         }
-    }
-    else {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Liste des itinéraires", style = MaterialTheme.typography.headlineMedium)
 
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(routes) { route ->
-                    RouteCard(route)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RouteCard(route: Route) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            //Text(text = "Départ: ${route.startAddress}", style = MaterialTheme.typography.headlineSmall)
-            //Text(text = "Arrivée: ${route.endAddress}", style = MaterialTheme.typography.headlineSmall)
-            Text(text = "Distance: ${route.distance}", style = MaterialTheme.typography.bodySmall)
-            Text(text = "Durée: ${route.duration}", style = MaterialTheme.typography.bodySmall)
-        }
-    }
 }
