@@ -132,7 +132,19 @@ fun AddTripScreenPage(
     }
 }
 
-data class Route(/*val polyline: String, */val distance: String, val duration: String)
+data class Route(
+    val distance: String,
+    val duration: String,
+    val transportDepartTime: String,
+    val transportArrivalTime: String,
+    val startAddress: String,
+    val endAddress: String,
+    val startStop: String,
+    val endStop: String,
+    val direction: String,
+    val nbStop: Int,
+    val lineNumber: String,
+    val vehicleType: String)
 
 fun getRoutes(
     originLat: Double,
@@ -164,8 +176,49 @@ fun getRoutes(
                             val legs = routeJson.getJSONArray("legs").getJSONObject(0)
                             val distance = legs.getJSONObject("distance").getString("text")
                             val duration = legs.getJSONObject("duration").getString("text")
+                            val startAddress = legs.getString("start_address")
+                            val endAddress = legs.getString("end_address")
 
-                            routeList.add(Route(/*overviewPolyline,*/distance, duration))
+                            val steps = legs.getJSONArray("steps")
+                            var arrivalStop = ""
+                            var arrivalTime = ""
+                            var departStop = ""
+                            var departureTime = ""
+                            var direction = ""
+                            var nbStop = 0
+                            var lineNumber = ""
+                            var vehicleType = ""
+
+                            for (j in 0 until steps.length()) {
+                                val step = steps.getJSONObject(j)
+
+                                if (step.getString("travel_mode") == "TRANSIT") {
+                                    val transitDetails = step.getJSONObject("transit_details")
+                                    arrivalStop = transitDetails.getJSONObject("arrival_stop").getString("name")
+                                    arrivalTime = transitDetails.getJSONObject("arrival_time").getString("text")
+                                    departStop = transitDetails.getJSONObject("departure_stop").getString("name")
+                                    departureTime = transitDetails.getJSONObject("departure_time").getString("text")
+                                    direction = transitDetails.getString("headsign")
+                                    nbStop = transitDetails.getInt("num_stops")
+                                    val line = transitDetails.getJSONObject("line")
+                                    lineNumber = line.optString("short_name", "N/A")
+                                    vehicleType = line.getJSONObject("vehicle").getString("name")
+                                }
+                            }
+                            routeList.add(Route(
+                                distance = distance,
+                                duration = duration,
+                                transportDepartTime = departureTime,
+                                transportArrivalTime = arrivalTime,
+                                startAddress = startAddress,
+                                endAddress = endAddress,
+                                startStop = departStop,
+                                endStop = arrivalStop,
+                                direction = direction,
+                                nbStop = nbStop,
+                                lineNumber = lineNumber,
+                                vehicleType = vehicleType
+                            ))
                         }
                         onResult(routeList)
 
@@ -458,7 +511,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                     }
                 }
             }) {
-                Text(text = "Ajouter un trajet")
+                Text(text = "Voir les trajets")
             }
         }
     }

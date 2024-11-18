@@ -103,8 +103,10 @@ fun MainScreen(
     onUpdateSettings: (String, String, String, String, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    var routes by remember { mutableStateOf<List<Route>>(emptyList()) }
+    var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
     var events by remember { mutableStateOf(mutableListOf<Event>()) }
+    var savedRoutes = remember { mutableStateListOf<Route>() } // trajets ajoutés
+    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","",0,"","")) }
 
     Scaffold(
         topBar = {
@@ -118,7 +120,7 @@ fun MainScreen(
         }
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding))
+            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding), routes = savedRoutes)
             1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding),
                 locationManager = locationManager,
                 onRoutesFetched = { fetchedRoutes ->
@@ -148,7 +150,21 @@ fun MainScreen(
                     )
                 }
             )
-            4 -> ListItineraires(routes = routes, modifier = Modifier.padding(16.dp))
+            4 -> ListItineraires(
+                onViewDetails = { route ->
+                    selectedRoute.value = route
+                    selectedTab = 5
+                },
+                routes = routes,
+                modifier = Modifier.padding(16.dp))
+            5 -> ItineraireDetails(
+                modifier = Modifier.padding(16.dp),
+                selectedRoute = selectedRoute.value,
+                onAddRoute = { route ->
+                    savedRoutes.add(route)
+                    selectedTab = 0
+                }
+            )
         }
     }
 }

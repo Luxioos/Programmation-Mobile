@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun HomeScreenPage(modifier: Modifier = Modifier) {
+fun HomeScreenPage(modifier: Modifier = Modifier, routes: List<Route>) {
     Scaffold(
         topBar = {
             AppTopBar(title = "Accueil")
@@ -41,17 +41,18 @@ fun HomeScreenPage(modifier: Modifier = Modifier) {
         }
     ) {
         Box(modifier = modifier.padding(it)) {
-            HomeContent()
+            HomeContent(routes)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent() {
+fun HomeContent(routes: List<Route>) {
         Column(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Titre
@@ -65,34 +66,45 @@ fun HomeContent() {
 
             // Texte sous le titre
             Text(
-                text = "Prochain trajet",
+                text = "Prochain(s) trajet(s)",
                 fontSize = 20.sp,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
 
-            // Encadré
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+            if (routes.isEmpty()) {
+                // Encadré
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(4.dp)
                 ) {
-                    Text(
-                        text = "Vous n'avez aucun trajet de prévu",
-                        fontSize = 14.sp
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "Vous n'avez aucun trajet de prévu",
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            } else {
+                LazyColumn {
+                    items(routes) { route ->
+                        RouteCard(
+                            route = route,
+                            modifier = Modifier.fillMaxWidth(),
+                            onViewDetails = { }
+                        )
+                    }
                 }
             }
         }
-
 }
