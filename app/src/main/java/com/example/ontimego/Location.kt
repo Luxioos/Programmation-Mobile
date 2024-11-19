@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.AsyncTask
 import android.os.Looper
 import android.widget.Toast
 import androidx.compose.runtime.Composable
@@ -15,7 +16,11 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+
 
 class LocationManager(private val activity: Activity) {
 
@@ -72,18 +77,20 @@ class LocationManager(private val activity: Activity) {
     }
 
     fun stopLocationUpdates() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        if(::locationCallback.isInitialized){
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
     }
 
     @SuppressLint("MissingPermission")
     fun getCurrentLocation(onLocationReceived: (latitude: Double, longitude: Double) -> Unit) {
-        fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-            if (location != null) {
-                onLocationReceived(location.latitude, location.longitude)
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    onLocationReceived(location.latitude, location.longitude)
+                } else {
+                    startLocationUpdates()
+                }
             }
-            else {
-                startLocationUpdates()
-            }
-        }
+
     }
 }

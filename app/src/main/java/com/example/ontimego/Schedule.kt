@@ -19,6 +19,7 @@ import androidx.compose.ui.res.painterResource
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 import java.util.*
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -58,9 +59,11 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
@@ -173,13 +176,56 @@ fun ScheduleSidebar(
 
 @Composable
 fun Schedule(
-    events: List<Event>,
+    routes: List<Route>,
     modifier: Modifier = Modifier,
     eventContent: @Composable (event: Event) -> Unit = { BasicEvent(event = it) },
     dayHeader: @Composable (day: LocalDate) -> Unit = { BasicDayHeader(day = it) },
-    minDate: LocalDate = events.minByOrNull(Event::start)!!.start.toLocalDate(),
-    maxDate: LocalDate = events.maxByOrNull(Event::end)!!.end.toLocalDate(),
 ) {
+
+    var events = mutableListOf<Event>()
+    for(route in routes){
+
+        Log.i("TAG","depart : " + route.departureTime)
+        Log.i("TAG","depart : " + route.duration)
+
+        var departTime = route.departureTime.toLong()*1000
+        var duration = convertDurationStringToTimestamp(route.duration)
+
+        var arrivalTime = departTime + duration
+
+        var startTime = convertTimestampToISO8601(departTime)
+        var endTime = convertTimestampToISO8601(arrivalTime)
+
+
+        Log.i("TAG","depart : " + startTime)
+        Log.i("TAG","arrivée : " + endTime)
+
+
+        /*
+        val newEvent = Event(
+            name = "Trajet",
+            color = Color(0xFFAFBBF2),
+            start = LocalDateTime.parse("2021-05-18T09:00:00"),
+            end = LocalDateTime.parse("2021-05-18T11:00:00"),
+            description = "Moyen de transport : " + route.vehicleType,
+        )
+        */
+
+        val newEvent = Event(
+            name = "Trajet",
+            color = Color(0xFFAFBBF2),
+            start = LocalDateTime.parse(startTime),
+            end = LocalDateTime.parse(endTime),
+            description = "Moyen de transport : " + route.vehicleType,
+        )
+
+        events.add(newEvent)
+    }
+
+
+    var minDate = events.minByOrNull(Event::start)!!.start.toLocalDate()
+    var maxDate = events.maxByOrNull(Event::end)!!.end.toLocalDate()
+
     val dayWidth = 256.dp
     val hourHeight = 64.dp
     val verticalScrollState = rememberScrollState()
@@ -278,3 +324,54 @@ fun BasicSchedule(
         }
     }
 }
+
+data class Event(
+    val name: String,
+    val color: Color,
+    val start: LocalDateTime,
+    val end: LocalDateTime,
+    val description: String? = null,
+)
+
+fun convertTimestampToISO8601(timestamp: Long): String {
+    val instant = Instant.ofEpochMilli(timestamp)
+    val zoneId = ZoneId.systemDefault()
+
+    val localDateTime = instant.atZone(zoneId).toLocalDateTime()
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+    return localDateTime.format(formatter)
+}
+
+fun convertDurationStringToTimestamp(duration: String): Long {
+    var totalMillis: Long = 0
+
+    val daysRegex = """(\d+)\s*jours""".toRegex()
+    val hoursRegex = """(\d+)\s*hours?""".toRegex()
+    val minsRegex = """(\d+)\s*mins?""".toRegex()
+
+    val daysMatch = daysRegex.find(duration)
+    if (daysMatch != null) {
+        val days = daysMatch.groupValues[1].toLong()
+        totalMillis += days * 24 * 60 * 60 * 1000
+    }
+
+    val hoursMatch = hoursRegex.find(duration)
+    if (hoursMatch != null) {
+        val hours = hoursMatch.groupValues[1].toLong()
+        totalMillis += hours * 60 * 60 * 1000
+    }
+
+    val minsMatch = minsRegex.find(duration)
+    if (minsMatch != null) {
+        val mins = minsMatch.groupValues[1].toLong()
+        totalMillis += mins * 60 * 1000
+    }
+
+    return totalMillis
+}
+
+
+
+
+
+

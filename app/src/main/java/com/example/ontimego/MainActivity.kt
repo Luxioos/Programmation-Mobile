@@ -14,9 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
+import java.time.LocalDateTime
 
 
 class MainActivity : ComponentActivity() {
@@ -104,9 +106,8 @@ fun MainScreen(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
-    var events by remember { mutableStateOf(mutableListOf<Event>()) }
     var savedRoutes = remember { mutableStateListOf<Route>() } // trajets ajoutés
-    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","",0,"","")) }
+    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","","",0,"","")) }
 
     Scaffold(
         topBar = {
@@ -126,11 +127,8 @@ fun MainScreen(
                 onRoutesFetched = { fetchedRoutes ->
                     routes = fetchedRoutes
                     selectedTab = 4
-                },
-                onEventAdded = { newEvent ->
-                    events.add(newEvent)
                 })
-            2 -> ScheduleScreenPage(eventList = events,modifier = Modifier.padding(innerPadding))
+            2 -> ScheduleScreenPage(routes = savedRoutes,modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(
                 modifier = Modifier.padding(innerPadding),
                 userName = userName,

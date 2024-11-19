@@ -15,7 +15,7 @@ import java.time.LocalDateTime
 
 
 @Composable
-fun ScheduleScreenPage(eventList : List<Event>,modifier: Modifier = Modifier) { // Renamed function to avoid conflict
+fun ScheduleScreenPage(routes : List<Route>,modifier: Modifier = Modifier) { // Renamed function to avoid conflict
     Scaffold(
         topBar = {
             AppTopBar(title = "Emploi du temps")
@@ -27,8 +27,8 @@ fun ScheduleScreenPage(eventList : List<Event>,modifier: Modifier = Modifier) { 
 
         Box(modifier = modifier.padding(it)) {
             Surface() {
-                if(eventList.size != 0) {
-                    Schedule(events = eventList)
+                if(routes.size != 0) {
+                    Schedule(routes = routes)
                 } else {
                     Text("Aucun trajet enregistré")
                 }

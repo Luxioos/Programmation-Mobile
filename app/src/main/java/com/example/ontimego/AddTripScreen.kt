@@ -12,11 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -37,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.util.Calendar
@@ -69,7 +64,6 @@ import java.util.TimeZone
 fun AddTripScreenPage(
     locationManager: LocationManager,
     onRoutesFetched: (List<Route>) -> Unit,
-    onEventAdded : (Event) -> Unit,
     modifier: Modifier = Modifier
 ) { // Renamed function to avoid conflict
     val context = LocalContext.current
@@ -118,7 +112,7 @@ fun AddTripScreenPage(
             }
 
             if (hasLocationPermission) {
-                TripSetter(locationManager, onRoutesFetched, onEventAdded)
+                TripSetter(locationManager, onRoutesFetched)
             } else {
                 Text(
                     text = "Autorisation de localisation requise pour ajouter un trajet.",
@@ -133,6 +127,7 @@ fun AddTripScreenPage(
 }
 
 data class Route(
+    val departureTime: String,
     val distance: String,
     val duration: String,
     val transportDepartTime: String,
@@ -175,15 +170,20 @@ fun getRoutes(
                             //val overviewPolyline = routeJson.getJSONObject("overview_polyline").getString("points")
                             val legs = routeJson.getJSONArray("legs").getJSONObject(0)
                             val distance = legs.getJSONObject("distance").getString("text")
+
+
                             val duration = legs.getJSONObject("duration").getString("text")
                             val startAddress = legs.getString("start_address")
                             val endAddress = legs.getString("end_address")
 
+
+
                             val steps = legs.getJSONArray("steps")
                             var arrivalStop = ""
-                            var arrivalTime = ""
                             var departStop = ""
-                            var departureTime = ""
+                            var arrivalTransportTime = ""
+                            var departureTransportTime = ""
+                            var departureTime = departureTime.toString()
                             var direction = ""
                             var nbStop = 0
                             var lineNumber = ""
@@ -195,8 +195,8 @@ fun getRoutes(
                                 if (step.getString("travel_mode") == "TRANSIT") {
                                     val transitDetails = step.getJSONObject("transit_details")
                                     arrivalStop = transitDetails.getJSONObject("arrival_stop").getString("name")
-                                    arrivalTime = transitDetails.getJSONObject("arrival_time").getString("text")
-                                    departStop = transitDetails.getJSONObject("departure_stop").getString("name")
+                                    arrivalTransportTime = transitDetails.getJSONObject("arrival_time").getString("text")
+                                    departureTransportTime = transitDetails.getJSONObject("departure_stop").getString("name")
                                     departureTime = transitDetails.getJSONObject("departure_time").getString("text")
                                     direction = transitDetails.getString("headsign")
                                     nbStop = transitDetails.getInt("num_stops")
@@ -206,10 +206,11 @@ fun getRoutes(
                                 }
                             }
                             routeList.add(Route(
+                                departureTime = departureTime,
                                 distance = distance,
                                 duration = duration,
-                                transportDepartTime = departureTime,
-                                transportArrivalTime = arrivalTime,
+                                transportDepartTime = departureTransportTime,
+                                transportArrivalTime = arrivalTransportTime,
                                 startAddress = startAddress,
                                 endAddress = endAddress,
                                 startStop = departStop,
@@ -273,7 +274,7 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit,onEventAdded : (Event) -> Unit) {
+fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit) {
     val context = LocalContext.current
 
     val frequence = arrayOf("Unique","Journalier","Jour de la semaine","Week-end","Hebdomadaire")
@@ -478,14 +479,6 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(onClick = {
-                val newEvent = Event(
-                    name = "Google I/O Keynote",
-                    color = Color(0xFFAFBBF2),
-                    start = LocalDateTime.parse("2021-05-18T09:00:00"),
-                    end = LocalDateTime.parse("2021-05-18T11:00:00"),
-                    description = "Tune in to find out about how we're furthering our mission to organize the world’s information and make it universally accessible and useful.",
-                )
-                onEventAdded(newEvent)
                 locationManager.getCurrentLocation { originLat, originLng ->
                     geocodeAddress(selectedAdresse) { destLat, destLng ->
                         if (destLat != null && destLng != null) {
@@ -497,15 +490,6 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                             getRoutes(originLat, originLng, destLat, destLng, mode, departureTime) { routes ->
                                 // envoyer les itinéraires à HomeScreen
                                 onRoutesFetched(routes)
-                                // rajoute le nouveau trajet aux évènements
-                                val newEvent = Event(
-                                    name = "Google I/O Keynote",
-                                    color = Color(0xFFAFBBF2),
-                                    start = LocalDateTime.parse("2021-05-18T09:00:00"),
-                                    end = LocalDateTime.parse("2021-05-18T11:00:00"),
-                                    description = "Tune in to find out about how we're furthering our mission to organize the world’s information and make it universally accessible and useful.",
-                                )
-                                onEventAdded(newEvent)
                             }
                         }
                     }
@@ -516,7 +500,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
         }
     }
 
-    }
+}
 
 fun convertToTimestamp(date: String, time: String): Long {
     // Combiner date et heure en une seule chaîne
@@ -534,5 +518,3 @@ fun convertToTimestamp(date: String, time: String): Long {
     // Retourner le timestamp UNIX en secondes
     return dateTime?.time?.div(1000) ?: throw IllegalArgumentException("Date ou heure invalide")
 }
-
-
