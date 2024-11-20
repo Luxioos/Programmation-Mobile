@@ -64,7 +64,6 @@ fun HomeContent(routes: List<Route>) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Texte sous le titre
             Text(
                 text = "Prochain(s) trajet(s)",
                 fontSize = 20.sp,
@@ -72,7 +71,6 @@ fun HomeContent(routes: List<Route>) {
             )
 
             if (routes.isEmpty()) {
-                // Encadré
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

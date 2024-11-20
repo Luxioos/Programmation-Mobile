@@ -46,8 +46,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
@@ -64,8 +68,8 @@ import java.util.TimeZone
 fun AddTripScreenPage(
     locationManager: LocationManager,
     onRoutesFetched: (List<Route>) -> Unit,
-    modifier: Modifier = Modifier
-) { // Renamed function to avoid conflict
+    defaultAddress: String,
+    modifier: Modifier = Modifier) { // Renamed function to avoid conflict
     val context = LocalContext.current
     var hasLocationPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
@@ -112,7 +116,7 @@ fun AddTripScreenPage(
             }
 
             if (hasLocationPermission) {
-                TripSetter(locationManager, onRoutesFetched)
+                TripSetter(locationManager, onRoutesFetched, defaultAddress = defaultAddress)
             } else {
                 Text(
                     text = "Autorisation de localisation requise pour ajouter un trajet.",
@@ -154,7 +158,7 @@ fun getRoutes(
 
         val client = OkHttpClient()
         val url =
-            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&departure_time=$departureTime&alternatives=true&key="
+            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&departure_time=$departureTime&alternatives=true&key=CLE_API"
 
         val request = Request.Builder().url(url).build()
         try {
@@ -246,7 +250,7 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
                 " ",
                 "+"
             )
-        }&key="
+        }&key=CLE_API"
 
         val request = Request.Builder().url(url).build()
         try {
@@ -274,8 +278,12 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) -> Unit) {
+fun TripSetter(
+    locationManager: LocationManager,
+    onRoutesFetched: (List<Route>) -> Unit,
+    defaultAddress: String) {
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val frequence = arrayOf("Unique","Journalier","Jour de la semaine","Week-end","Hebdomadaire")
     var selectedFrequency by remember { mutableStateOf(frequence[0]) }
@@ -288,7 +296,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
     var selectedDate by remember { mutableStateOf("") }
     var showCalendar by remember { mutableStateOf(false) }
 
-    var selectedAdresse by remember { mutableStateOf("") }
+    var selectedAdresse by remember { mutableStateOf(defaultAddress) }
     var isAddressSelected by remember { mutableStateOf(false) }
     var hasInteractedWithAddress by remember { mutableStateOf(false) }
     val addressSuggestions = remember { mutableStateListOf<AddressSuggestion>() }
@@ -327,7 +335,13 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                             contentDescription = "Ouvrir le calendrier",
                         )
                     }
-                }
+                },
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -353,7 +367,13 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFrequency) },
-                    modifier = Modifier.menuAnchor()
+                    modifier = Modifier.menuAnchor(),
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                        }
+                    )
                 )
 
                 ExposedDropdownMenu(
@@ -373,7 +393,7 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Adresse d'arrivée")
+            Text("Adresse de destination")
             OutlinedTextField(
                 value = selectedAdresse,
                 onValueChange = { query ->
@@ -383,6 +403,12 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                 },
                 label = { Text("Adresse") },
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
             )
 
             if (addressSuggestions.isNotEmpty()) {
@@ -421,7 +447,13 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                             contentDescription = "Ouvrir la sélection d'heure",
                         )
                     }
-                }
+                },
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -457,7 +489,13 @@ fun TripSetter(locationManager: LocationManager, onRoutesFetched: (List<Route>) 
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedTransport) },
-                    modifier = Modifier.menuAnchor()
+                    modifier = Modifier.menuAnchor(),
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                        }
+                    )
                 )
 
                 ExposedDropdownMenu(

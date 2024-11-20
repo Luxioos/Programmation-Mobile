@@ -45,7 +45,7 @@ fun ListItineraires(
         }
     ) { innerPadding ->
         Column(modifier = modifier.padding(innerPadding).fillMaxSize()) {
-            Text(text = "Itinéraires proposés", style = MaterialTheme.typography.headlineMedium)
+            Text(text = "Sélectionnez un itinéraire", style = MaterialTheme.typography.headlineMedium)
             LazyColumn {
                 items(routes) { route ->
                     RouteCard(

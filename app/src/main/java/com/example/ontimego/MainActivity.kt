@@ -6,7 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,11 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
-import java.time.LocalDateTime
+import kotlin.reflect.KFunction3
 
 
 class MainActivity : ComponentActivity() {
@@ -37,25 +38,16 @@ class MainActivity : ComponentActivity() {
                 var userName by remember { mutableStateOf("") }
                 var transportMode by remember { mutableStateOf("") }
                 var userAddress by remember { mutableStateOf("") }
-                var userCity by remember { mutableStateOf("") }
-                var userPostalCode by remember { mutableStateOf("") }
-                var userCountry by remember { mutableStateOf("Canada") }
                 var isSetupComplete by remember { mutableStateOf(false) }
 
                 fun updateUserSettings(
                     newUserName: String,
                     newTransportMode: String,
-                    newAddress: String,
-                    newCity: String,
-                    newPostalCode: String,
-                    newCountry: String)
-                {
+                    newAddress: String
+                ) {
                     userName = newUserName
                     transportMode = newTransportMode
                     userAddress = newAddress
-                    userCity = newCity
-                    userPostalCode = newPostalCode
-                    userCountry = newCountry
                 }
 
                 if (!isSetupComplete) {
@@ -75,9 +67,6 @@ class MainActivity : ComponentActivity() {
                         userName = userName,
                         transportMode = transportMode,
                         userAddress = userAddress,
-                        userCity = userCity,
-                        userPostalCode = userPostalCode,
-                        userCountry = userCountry,
                         onScreenChange = { currentScreen = it },
                         onUpdateSettings = ::updateUserSettings
                     )
@@ -98,11 +87,8 @@ fun MainScreen(
     userName: String,
     transportMode: String,
     userAddress: String,
-    userCity: String,
-    userPostalCode: String,
-    userCountry: String,
     onScreenChange: (Int) -> Unit,
-    onUpdateSettings: (String, String, String, String, String, String) -> Unit
+    onUpdateSettings: KFunction3<String, String, String, Unit>
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
@@ -126,25 +112,20 @@ fun MainScreen(
                 locationManager = locationManager,
                 onRoutesFetched = { fetchedRoutes ->
                     routes = fetchedRoutes
-                    selectedTab = 4
-                })
+                    selectedTab = 4 },
+                defaultAddress = userAddress
+            )
             2 -> ScheduleScreenPage(routes = savedRoutes,modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(
                 modifier = Modifier.padding(innerPadding),
                 userName = userName,
                 transportMode = transportMode,
                 address = userAddress,
-                city = userCity,
-                postalCode = userPostalCode,
-                country = userCountry,
-                onSave = { name, mode, address, city, postalCode, country ->
+                onSave = { name, mode, address  ->
                     onUpdateSettings(
                         name,
                         mode,
-                        address,
-                        city,
-                        postalCode,
-                        country
+                        address
                     )
                 }
             )
@@ -178,38 +159,61 @@ fun NavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
         ) {
             NavigationBarItem(
                 icon = {
-                    Icon(painterResource(id = R.drawable.home), contentDescription = "Accueil", modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            painterResource(id = R.drawable.home),
+                            contentDescription = "Accueil",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text("Accueil", style = MaterialTheme.typography.bodySmall)
+                    }
                 },
-                label = { Text("Accueil") },
                 selected = selectedTab == 0,
                 onClick = { onTabSelected(0) }
             )
             NavigationBarItem(
-                icon = {
-                    Icon(painterResource(id = R.drawable.add), contentDescription = "Ajouter un trajet", modifier = Modifier.size(24.dp))
-                },
-                label = { Text("Ajouter un trajet") },
-                selected = selectedTab == 1,
-                onClick = { onTabSelected(1) }
+                    icon = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                painterResource(id = R.drawable.add),
+                                contentDescription = "Ajouter un trajet",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text("Ajouter un trajet", style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+            selected = selectedTab == 1,
+            onClick = { onTabSelected(1) }
             )
             NavigationBarItem(
                 icon = {
-                    Icon(painterResource(id = R.drawable.calendar), contentDescription = "Emploi du temps", modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            painterResource(id = R.drawable.calendar),
+                            contentDescription = "Emploi du temps",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text("Agenda", style = MaterialTheme.typography.bodySmall)
+                    }
                 },
-                label = { Text( "Agenda") },
                 selected = selectedTab == 2,
                 onClick = { onTabSelected(2) }
             )
             NavigationBarItem(
                 icon = {
-                    Icon(painterResource(id = R.drawable.equalizer), contentDescription = "Paramètres", modifier = Modifier.size(24.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            painterResource(id = R.drawable.equalizer),
+                            contentDescription = "Paramètres",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text("Paramètres", style = MaterialTheme.typography.bodySmall)
+                    }
                 },
-                label = { Text("Paramètres") },
                 selected = selectedTab == 3,
                 onClick = { onTabSelected(3) }
             )
         }
-
     }
 }
 

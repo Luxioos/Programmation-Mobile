@@ -5,11 +5,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -28,32 +32,21 @@ fun SettingsScreen(
     userName: String,
     transportMode: String,
     address: String,
-    city: String,
-    postalCode: String,
-    country: String,
-    onSave: (String, String, String, String, String, String) -> Unit
+    onSave: (String, String, String) -> Unit
 ) {
     var editableUserName by remember { mutableStateOf(userName) }
     var editableTransportMode by remember { mutableStateOf(transportMode) }
     var editableAddress by remember { mutableStateOf(address) }
-    var editableCity by remember { mutableStateOf(city) }
-    var editablePostalCode by remember { mutableStateOf(postalCode) }
-    var editableCountry by remember { mutableStateOf(country) }
     var expandedTransport by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val addressSuggestions = remember { mutableStateListOf<AddressSuggestion>() }
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var isAddressSelected by remember { mutableStateOf(false) }
     var hasInteractedWithAddress by remember { mutableStateOf(false) }
 
     fun onAddressSelected(suggestion: AddressSuggestion) {
-        fetchPlaceDetails(suggestion.placeId) { street, city, postal, country ->
-            editableAddress = street
-            editableCity = city
-            editablePostalCode = postal
-            editableCountry = country
-        }
+        editableAddress = suggestion.description
         addressSuggestions.clear()
         isAddressSelected = true
         hasInteractedWithAddress = false
@@ -83,7 +76,13 @@ fun SettingsScreen(
             value = editableUserName,
             onValueChange = { editableUserName = it },
             label = { Text("Nom") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    keyboardController?.hide()
+                }
+            )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -100,7 +99,13 @@ fun SettingsScreen(
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedTransport) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor()
+                    .menuAnchor(),
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
             )
             ExposedDropdownMenu(
                 expanded = expandedTransport,
@@ -120,6 +125,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        Text("Lieu principal de travail ou d'études", style = MaterialTheme.typography.bodyLarge)
         OutlinedTextField(
             value = editableAddress,
             onValueChange = { query ->
@@ -132,7 +138,13 @@ fun SettingsScreen(
                 }
             },
             label = { Text("Adresse") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    keyboardController?.hide()
+                }
+            )
         )
 
         if (addressSuggestions.isNotEmpty()) {
@@ -151,45 +163,11 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = editableCity,
-            onValueChange = { editableCity = it },
-            label = { Text("Ville") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = editablePostalCode,
-            onValueChange = { editablePostalCode = it },
-            label = { Text("Code Postal") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = editableCountry,
-            onValueChange = { editableCountry = it },
-            label = { Text("Pays") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
-                onSave(
-                    editableUserName,
-                    editableTransportMode,
-                    editableAddress,
-                    editableCity,
-                    editablePostalCode,
-                    editableCountry
-                )
+                onSave(editableUserName, editableTransportMode, editableAddress)
                 coroutineScope.launch {
                     val snackbarJob = launch {
                         snackbarHostState.showSnackbar("Sauvegarde réussie !")
@@ -243,56 +221,3 @@ fun fetchAddressSuggestions(query: String, onSuggestionsFetched: (List<AddressSu
         }
     })
 }
-
-fun fetchPlaceDetails(placeId: String, onDetailsFetched: (String, String, String, String) -> Unit) {
-    val client = OkHttpClient()
-    val apiKey = "CLE_API"
-    val url = "https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey"
-
-    val request = Request.Builder().url(url).build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            onDetailsFetched("", "", "", "")
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            if (response.isSuccessful) {
-                val json = JSONObject(response.body?.string() ?: "")
-                val addressComponents = json.getJSONObject("result").getJSONArray("address_components")
-
-                var streetAddress = ""
-                var city = ""
-                var postalCode = ""
-                var country = ""
-
-                for (i in 0 until addressComponents.length()) {
-                    val component = addressComponents.getJSONObject(i)
-                    val types = component.getJSONArray("types")
-
-                    when {
-                        "street_number" in types.toString() -> {
-                            streetAddress = component.getString("long_name") + " $streetAddress"
-                        }
-                        "route" in types.toString() -> {
-                            streetAddress += component.getString("long_name")
-                        }
-                        "locality" in types.toString() -> {
-                            city = component.getString("long_name")
-                        }
-                        "postal_code" in types.toString() -> {
-                            postalCode = component.getString("long_name")
-                        }
-                        "country" in types.toString() -> {
-                            country = component.getString("long_name")
-                        }
-                    }
-                }
-                onDetailsFetched(streetAddress, city, postalCode, country)
-            } else {
-                onDetailsFetched("", "", "", "")
-            }
-        }
-    })
-}
-
