@@ -1,5 +1,7 @@
 package com.example.ontimego
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
-import kotlin.reflect.KFunction3
 
 
 class MainActivity : ComponentActivity() {
@@ -34,17 +34,36 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             OnTimeGoTheme {
+                /**
+                 * Déclaration des variables
+                 */
+                // Préferences pour sauvegarder les informations de l'utilisateur sur l'appli de SON appareil, elles sont encore là même si il quitte l'appli et revient
+                val sharedPreferences: SharedPreferences =
+                    getSharedPreferences("OnTimeGoPrefs", Context.MODE_PRIVATE)
+                val storedUserName = sharedPreferences.getString("userName", null)
+                val storedTransportMode = sharedPreferences.getString("transportMode", null)
+                val storedUserAddress = sharedPreferences.getString("userAddress", "")
+                val isSetupCompleteInitially = storedUserName != null && storedTransportMode != null
                 var currentScreen by remember { mutableStateOf(0) }
-                var userName by remember { mutableStateOf("") }
-                var transportMode by remember { mutableStateOf("") }
-                var userAddress by remember { mutableStateOf("") }
-                var isSetupComplete by remember { mutableStateOf(false) }
+                var userName by remember { mutableStateOf(storedUserName ?: "") }
+                var transportMode by remember { mutableStateOf(storedTransportMode ?: "") }
+                var userAddress by remember { mutableStateOf(storedUserAddress ?: "") }
+                var isSetupComplete by remember { mutableStateOf(isSetupCompleteInitially) }
 
+                /**
+                 * Mise à jour des paramètres utilisateur, nom/mode de transport/adresse
+                 */
                 fun updateUserSettings(
                     newUserName: String,
                     newTransportMode: String,
                     newAddress: String
                 ) {
+                    sharedPreferences.edit()
+                        .putString("userName", newUserName)
+                        .putString("transportMode", newTransportMode)
+                        .putString("userAddress", newAddress)
+                        .apply()
+
                     userName = newUserName
                     transportMode = newTransportMode
                     userAddress = newAddress
@@ -53,10 +72,12 @@ class MainActivity : ComponentActivity() {
                 if (!isSetupComplete) {
                     when (currentScreen) {
                         0 -> WelcomeScreen { name ->
+                            sharedPreferences.edit().putString("userName", name).apply()
                             userName = name
                             currentScreen = 1
                         }
                         1 -> TransportModeScreen(userName) { mode ->
+                            sharedPreferences.edit().putString("transportMode", mode).apply()
                             transportMode = mode
                             isSetupComplete = true
                         }
@@ -81,6 +102,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Contenu de la page actuelle vue par l'utilisateur
+ */
 @Composable
 fun MainScreen(
     locationManager: LocationManager,
@@ -88,12 +112,12 @@ fun MainScreen(
     transportMode: String,
     userAddress: String,
     onScreenChange: (Int) -> Unit,
-    onUpdateSettings: KFunction3<String, String, String, Unit>
+    onUpdateSettings: (String, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
     var savedRoutes = remember { mutableStateListOf<Route>() } // trajets ajoutés
-    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","","",0,"","")) }
+    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","","",0,"","", appointmentTime = "", userDepartureTime = "")) }
 
     Scaffold(
         topBar = {

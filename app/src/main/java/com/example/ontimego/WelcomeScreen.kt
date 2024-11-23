@@ -1,19 +1,25 @@
 package com.example.ontimego
 
+import android.content.Context.MODE_PRIVATE
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
+/**
+ * Page au lancement quand l'utilisateur doit entrer son nom
+ */
 @Composable
 fun WelcomeScreen(onNext: (String) -> Unit) {
     var userName by remember { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -34,9 +40,16 @@ fun WelcomeScreen(onNext: (String) -> Unit) {
                 }
             )
         )
+
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(
-            onClick = { onNext(userName) },
+            onClick = {
+                // Sauvegarde du nom dans les préférences
+                val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
+                sharedPreferences.edit().putString("USER_NAME", userName).apply()
+                onNext(userName)
+            },
             enabled = userName.isNotBlank()
         ) {
             Text("Suivant")

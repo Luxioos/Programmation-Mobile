@@ -1,15 +1,21 @@
 package com.example.ontimego
 
+import android.content.Context.MODE_PRIVATE
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
+/**
+ * Page au lancement quand l'utilisateur doit entrer son mode de transport favori
+ */
 @Composable
 fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
     var selectedMode by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -33,8 +39,14 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(
-            onClick = { onNext(selectedMode) },
+            onClick = {
+                // Sauvegarde du mode de transport dans les préférences
+                val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
+                sharedPreferences.edit().putString("TRANSPORT_MODE", selectedMode).apply()
+                onNext(selectedMode)
+            },
             enabled = selectedMode.isNotBlank()
         ) {
             Text("Suivant")

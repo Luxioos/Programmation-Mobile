@@ -1,5 +1,8 @@
 package com.example.ontimego
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,6 +41,11 @@ fun SettingsScreen(
     address: String,
     onSave: (String, String, String) -> Unit
 ) {
+    /**
+     * Déclaration des variables
+     */
+    val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("UserSettings", Context.MODE_PRIVATE)
     var editableUserName by remember { mutableStateOf(userName) }
     var editableTransportMode by remember { mutableStateOf(transportMode) }
     var editableAddress by remember { mutableStateOf(address) }
@@ -45,11 +57,25 @@ fun SettingsScreen(
     var isAddressSelected by remember { mutableStateOf(false) }
     var hasInteractedWithAddress by remember { mutableStateOf(false) }
 
+    /**
+     * Quand une adresse est cliquée/sélectionnée dans la liste des suggestions
+     */
     fun onAddressSelected(suggestion: AddressSuggestion) {
         editableAddress = suggestion.description
         addressSuggestions.clear()
         isAddressSelected = true
         hasInteractedWithAddress = false
+    }
+
+    /**
+     * Sauvegarder les infos entrées par l'utilisateur
+     */
+    fun saveUserSettings() {
+        val editor = sharedPreferences.edit()
+        editor.putString("userName", editableUserName)
+        editor.putString("transportMode", editableTransportMode)
+        editor.putString("userAddress", editableAddress)
+        editor.apply()
     }
 
     LaunchedEffect(editableAddress, hasInteractedWithAddress) {
@@ -63,6 +89,20 @@ fun SettingsScreen(
         }
     }
 
+    /**
+     * Rediriger vers les paramètres systèmes de l'application
+     */
+    fun openAppSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Contenu de la page
+     */
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -70,7 +110,7 @@ fun SettingsScreen(
     ) {
         Text("Paramètres du profil", style = MaterialTheme.typography.headlineSmall)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = editableUserName,
@@ -85,7 +125,7 @@ fun SettingsScreen(
             )
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text("Mode de transport", style = MaterialTheme.typography.bodyLarge)
         ExposedDropdownMenuBox(
@@ -123,7 +163,7 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text("Lieu principal de travail ou d'études", style = MaterialTheme.typography.bodyLarge)
         OutlinedTextField(
@@ -163,11 +203,35 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Autorisations",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = {
+                openAppSettings(context)
+            }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.fleche_grise),
+                    contentDescription = "Ouvrir les paramètres de l'application"
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
                 onSave(editableUserName, editableTransportMode, editableAddress)
+                saveUserSettings()
                 coroutineScope.launch {
                     val snackbarJob = launch {
                         snackbarHostState.showSnackbar("Sauvegarde réussie !")
@@ -190,6 +254,9 @@ fun SettingsScreen(
 
 data class AddressSuggestion(val description: String, val placeId: String)
 
+/**
+ * Récupérer les adresses selon ce qui est écrit par l'utilisateur avec l'API Google Places
+ */
 fun fetchAddressSuggestions(query: String, onSuggestionsFetched: (List<AddressSuggestion>) -> Unit) {
     val client = OkHttpClient()
     val apiKey = "CLE_API"
@@ -208,7 +275,7 @@ fun fetchAddressSuggestions(query: String, onSuggestionsFetched: (List<AddressSu
                 val predictions = json.getJSONArray("predictions")
                 val suggestions = mutableListOf<AddressSuggestion>()
 
-                for (i in 0 until minOf(predictions.length(), 10)) {
+                for (i in 0 until minOf(predictions.length(), 5)) {
                     val prediction = predictions.getJSONObject(i)
                     val description = prediction.getString("description")
                     val placeId = prediction.getString("place_id")

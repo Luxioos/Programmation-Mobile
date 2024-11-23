@@ -2,6 +2,7 @@ package com.example.ontimego
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.window.SplashScreen
 import androidx.activity.ComponentActivity
@@ -24,16 +25,32 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.logging.Handler
 import androidx.compose.foundation.Image
+import androidx.lifecycle.lifecycleScope
 
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        CoroutineScope(Dispatchers.Main).launch {
+        val sharedPreferences = getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
+        val userName = sharedPreferences.getString("USER_NAME", null)
+        val transportMode = sharedPreferences.getString("TRANSPORT_MODE", null)
+
+        /*CoroutineScope(Dispatchers.Main).launch {
             delay(2000) // 2 secondes
             val intent = Intent(this@SplashActivity, MainActivity::class.java)
             startActivity(intent)
+            finish()
+        }*/
+        lifecycleScope.launch {
+            delay(2000) // 2 secondes
+
+            val nextActivity = if (userName != null && transportMode != null) {
+                MainActivity::class.java
+            } else {
+                WelcomeActivity::class.java
+            }
+            startActivity(Intent(this@SplashActivity, nextActivity))
             finish()
         }
 

@@ -88,15 +88,27 @@ fun RouteCard(route: Route, modifier: Modifier, onViewDetails: (Route) -> Unit) 
             RowInfo(label = "Arrivée :", value = "${route.endAddress}")
             RowInfo(label = "Distance :", value = "${route.distance}")
             RowInfo(label = "Durée :", value = "${route.duration}")
+            Text(text = "${route.vehicleType} ${route.lineNumber}", style = MaterialTheme.typography.bodyMedium)
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "${route.vehicleType} ${route.lineNumber}", style = MaterialTheme.typography.bodyMedium)
-            RowInfo(label = "Départ arrêt :", value = "${route.startStop} (${route.transportDepartTime})")
-            RowInfo(label = "Arrivée arrêt :", value = "${route.endStop} (${route.transportArrivalTime})")
-            RowInfo(label = "Direction :", value = "${route.direction}")
-            RowInfo(label = "Nombre d'arrêts :", value = "${route.nbStop}")
+            if(route.vehicleType == "Bus") { // Champs nécessaires qu'aux trajets en bus
+                RowInfo(
+                    label = "Départ arrêt :",
+                    value = "${route.startStop} (${route.transportDepartTime})"
+                )
+                RowInfo(
+                    label = "Arrivée arrêt :",
+                    value = "${route.endStop} (${route.transportArrivalTime})"
+                )
+                RowInfo(label = "Direction :", value = "${route.direction}")
+                RowInfo(label = "Nombre d'arrêts :", value = "${route.nbStop}")
+            }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            RowInfo(label = "Rendez-vous à:", value = "${route.appointmentTime}")
+            RowInfo(label = "Heure de départ conseillée :", value = "${route.userDepartureTime}")
         }
     }
 }
