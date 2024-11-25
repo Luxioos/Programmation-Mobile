@@ -54,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import okhttp3.Call
@@ -132,6 +133,7 @@ fun AddTripScreenPage(
  */
 
 data class Route(
+    val longArrivalTime : Long,
     val departureTime: String,
     val distance: String,
     val duration: String,
@@ -166,8 +168,9 @@ fun getRoutes(
     CoroutineScope(Dispatchers.IO).launch {
 
         val client = OkHttpClient()
+        val cle_api ="cle_api"
         val url =
-            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&arrival_time=$arrivalTime&alternatives=true&key=CLE_API"
+            "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&arrival_time=$arrivalTime&alternatives=true&key=$cle_api"
 
         val request = Request.Builder().url(url).build()
         try {
@@ -226,6 +229,7 @@ fun getRoutes(
 
                                 routeList.add(
                                     Route(
+                                        longArrivalTime = arrivalTime,
                                         departureTime = departureTransportTime,
                                         distance = distance,
                                         duration = duration,
@@ -252,6 +256,7 @@ fun getRoutes(
                                 // Pour les modes non transit : driving, walking, bicycling
                                 routeList.add(
                                     Route(
+                                        longArrivalTime = arrivalTime,
                                         departureTime = "",
                                         distance = distance,
                                         duration = duration,
@@ -296,14 +301,14 @@ fun getRoutes(
 
 fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
     CoroutineScope(Dispatchers.IO).launch {
-
+        val cle_api = "cle_api"
         val client = OkHttpClient()
         val url = "https://maps.googleapis.com/maps/api/geocode/json?address=${
             address.replace(
                 " ",
                 "+"
             )
-        }&key=CLE_API"
+        }&key=$cle_api"
 
         val request = Request.Builder().url(url).build()
         try {

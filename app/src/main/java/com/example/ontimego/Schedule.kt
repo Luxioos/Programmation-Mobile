@@ -188,13 +188,14 @@ fun Schedule(
         Log.i("TAG","depart : " + route.departureTime)
         Log.i("TAG","depart : " + route.duration)
 
-        var departTime = route.departureTime.toLong()*1000
+        var arrivalTime = route.longArrivalTime*1000
         var duration = convertDurationStringToTimestamp(route.duration)
 
-        var arrivalTime = departTime + duration
+        var departTime = arrivalTime - duration
 
         var startTime = convertTimestampToISO8601(departTime)
         var endTime = convertTimestampToISO8601(arrivalTime)
+
 
 
         Log.i("TAG","depart : " + startTime)
@@ -212,7 +213,7 @@ fun Schedule(
         */
 
         val newEvent = Event(
-            name = "Trajet",
+            name = route.endAddress,
             color = Color(0xFFAFBBF2),
             start = LocalDateTime.parse(startTime),
             end = LocalDateTime.parse(endTime),

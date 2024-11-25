@@ -259,7 +259,7 @@ data class AddressSuggestion(val description: String, val placeId: String)
  */
 fun fetchAddressSuggestions(query: String, onSuggestionsFetched: (List<AddressSuggestion>) -> Unit) {
     val client = OkHttpClient()
-    val apiKey = "CLE_API"
+    val apiKey = "cle_api"
     val encodedQuery = query.replace(" ", "%20")
     val url = "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$encodedQuery&key=$apiKey"
     val request = Request.Builder().url(url).build()

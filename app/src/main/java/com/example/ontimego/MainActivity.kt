@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 
@@ -117,7 +118,7 @@ fun MainScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
     var savedRoutes = remember { mutableStateListOf<Route>() } // trajets ajoutés
-    var selectedRoute = remember { mutableStateOf<Route>(Route("","","","","","","","","","",0,"","", appointmentTime = "", userDepartureTime = "")) }
+    var selectedRoute = remember { mutableStateOf<Route>(Route(0,"","","","","","","","","","",0,"","", appointmentTime = "", userDepartureTime = "")) }
 
     Scaffold(
         topBar = {
@@ -203,7 +204,7 @@ fun NavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                                 contentDescription = "Ajouter un trajet",
                                 modifier = Modifier.size(24.dp)
                             )
-                            Text("Ajouter un trajet", style = MaterialTheme.typography.bodySmall)
+                            Text("Ajouter un trajet", style = MaterialTheme.typography.bodySmall,textAlign = TextAlign.Center)
                         }
                     },
             selected = selectedTab == 1,

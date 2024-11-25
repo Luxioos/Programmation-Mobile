@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">OnTimeGo</string>
+    <string name = "CLE_API">"cle_api"</string>
 </resources>
