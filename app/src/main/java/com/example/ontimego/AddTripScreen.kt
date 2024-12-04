@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,11 +38,9 @@ import java.util.Calendar
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.time.LocalDateTime
 import android.Manifest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.items
@@ -54,13 +51,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.Response
-import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,8 +82,6 @@ fun AddTripScreenPage(
         hasLocationPermission = isGranted
         if (isGranted) {
             Toast.makeText(context, "Accès à la localisation autorisé", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Accès à la localisation refusé", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -168,7 +158,7 @@ fun getRoutes(
     CoroutineScope(Dispatchers.IO).launch {
 
         val client = OkHttpClient()
-        val cle_api ="cle_api"
+        val cle_api ="CLE_API"
         val url =
             "https://maps.googleapis.com/maps/api/directions/json?origin=$originLat,$originLng&destination=$destLat,$destLng&mode=$mode&arrival_time=$arrivalTime&alternatives=true&key=$cle_api"
 
@@ -301,7 +291,7 @@ fun getRoutes(
 
 fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
     CoroutineScope(Dispatchers.IO).launch {
-        val cle_api = "cle_api"
+        val cle_api = "CLE_API"
         val client = OkHttpClient()
         val url = "https://maps.googleapis.com/maps/api/geocode/json?address=${
             address.replace(
@@ -377,12 +367,18 @@ fun TripSetter(
      */
 
     var hasNotificationPermission by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        hasNotificationPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasNotificationPermission = isGranted
-        if (!isGranted) {
-            Toast.makeText(context, "Permission de notifications refusée.", Toast.LENGTH_SHORT).show()
+        if (isGranted) {
+            Toast.makeText(context, "Permission de notifications accordée.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -391,14 +387,8 @@ fun TripSetter(
      */
 
     fun requestNotificationPermission() {
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!hasNotificationPermission) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            hasNotificationPermission = true
         }
     }
 
@@ -433,7 +423,7 @@ fun TripSetter(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 2.dp)
                 )
             }
             Text(text = "Sélectionner une date")
@@ -631,61 +621,59 @@ fun TripSetter(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(onClick = {
-                // Trouver les champs qui n'ont pas été remplis
                 val missingFields = mutableListOf<String>()
                 if (selectedDate.isBlank()) missingFields.add("Date")
                 if (selectedAdresse.isBlank()) missingFields.add("Adresse")
                 if (selectedTime.isBlank()) missingFields.add("Heure")
+
                 if (missingFields.isNotEmpty()) {
                     errorMessage = "Veuillez remplir le(s) champ(s) : ${missingFields.joinToString(", ")}"
                 } else {
                     errorMessage = ""
-                    isLoading = true
-                    requestNotificationPermission()
-                    if (hasNotificationPermission) {
-                    locationManager.getCurrentLocation { originLat, originLng ->
-                        geocodeAddress(selectedAdresse) { destLat, destLng ->
-                            if (destLat != null && destLng != null) {
-                                var mode: String
-                                if (selectedTransport == "Voiture") mode = "driving"
-                                else if (selectedTransport == "Marche") mode = "walking"
-                                else if (selectedTransport == "Vélo") mode = "bicycling"
-                                else mode = "transit"
-                                val arrivalTime = convertToTimestamp(selectedDate, selectedTime)
-                                //val departureTime = convertToTimestamp(selectedDate, selectedTime)
-                                getRoutes(
-                                    originLat,
-                                    originLng,
-                                    destLat,
-                                    destLng,
-                                    mode,
-                                    arrivalTime,
-                                    selectedTime,
-                                    arrivalTime
-                                ) { routes ->
-                                    val uniqueRoutes = removeDuplicateRoutes(routes)
-                                    val enrichedRoutes = uniqueRoutes.map { route ->
-                                        route.copy(
-                                            appointmentTime = selectedTime,
-                                            userDepartureTime = calculateDepartureTime(
+                    if (!hasNotificationPermission) {
+                        requestNotificationPermission()
+                    } else{
+                        isLoading = true
+                        locationManager.getCurrentLocation { originLat, originLng ->
+                            geocodeAddress(selectedAdresse) { destLat, destLng ->
+                                if (destLat != null && destLng != null) {
+                                    var mode: String
+                                    if (selectedTransport == "Voiture") mode = "driving"
+                                    else if (selectedTransport == "Marche") mode = "walking"
+                                    else if (selectedTransport == "Vélo") mode = "bicycling"
+                                    else mode = "transit"
+                                    val arrivalTime = convertToTimestamp(selectedDate, selectedTime)
+                                    //val departureTime = convertToTimestamp(selectedDate, selectedTime)
+                                    getRoutes(
+                                        originLat,
+                                        originLng,
+                                        destLat,
+                                        destLng,
+                                        mode,
+                                        arrivalTime,
+                                        selectedTime,
+                                        arrivalTime
+                                    ) { routes ->
+                                        val uniqueRoutes = removeDuplicateRoutes(routes)
+                                        val enrichedRoutes = uniqueRoutes.map { route ->
+                                            route.copy(
                                                 appointmentTime = selectedTime,
-                                                durationInSeconds = parseDurationToSeconds(route.duration),
-                                                isTransit = route.vehicleType == "Bus",
-                                                arrivalTime = if (route.vehicleType == "Bus") route.transportArrivalTime else null
+                                                userDepartureTime = calculateDepartureTime(
+                                                    appointmentTime = selectedTime,
+                                                    durationInSeconds = parseDurationToSeconds(route.duration),
+                                                    isTransit = route.vehicleType == "Bus",
+                                                    arrivalTime = if (route.vehicleType == "Bus") route.transportArrivalTime else null
+                                                )
                                             )
-                                        )
+                                        }
+                                        onRoutesFetched(enrichedRoutes)
+                                        isLoading = false
                                     }
-                                    onRoutesFetched(enrichedRoutes)
+                                }else{
+                                    isLoading = false
                                 }
                             }
-                        }
                     }
-                } else {
-                    Toast.makeText(
-                        context,
-                        "Veuillez autoriser les notifications pour continuer.",
-                        Toast.LENGTH_SHORT
-                    ).show()
                 }
             }
             }) {

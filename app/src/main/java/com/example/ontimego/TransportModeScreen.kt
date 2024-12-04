@@ -8,6 +8,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Page au lancement quand l'utilisateur doit entrer son mode de transport favori
@@ -42,14 +44,18 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
 
         Button(
             onClick = {
-                // Sauvegarde du mode de transport dans les préférences
-                val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
-                sharedPreferences.edit().putString("TRANSPORT_MODE", selectedMode).apply()
-                onNext(selectedMode)
+                if (selectedMode.isNotEmpty()) {
+                    val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
+                    sharedPreferences.edit()
+                        .putString("TRANSPORT_MODE", selectedMode)
+                        .apply()
+                    onNext(selectedMode)
+                }
             },
             enabled = selectedMode.isNotBlank()
         ) {
             Text("Suivant")
         }
     }
+    println("SplashActivity - Retrieved TRANSPORT_MODE: $selectedMode")
 }

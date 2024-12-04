@@ -11,6 +11,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Page au lancement quand l'utilisateur doit entrer son nom
@@ -45,10 +47,13 @@ fun WelcomeScreen(onNext: (String) -> Unit) {
 
         Button(
             onClick = {
-                // Sauvegarde du nom dans les préférences
-                val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
-                sharedPreferences.edit().putString("USER_NAME", userName).apply()
-                onNext(userName)
+                if (userName.isNotEmpty()) {
+                    val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
+                    sharedPreferences.edit()
+                        .putString("USER_NAME", userName)
+                        .apply()
+                    onNext(userName)
+                }
             },
             enabled = userName.isNotBlank()
         ) {

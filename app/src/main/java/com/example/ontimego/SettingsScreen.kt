@@ -45,7 +45,7 @@ fun SettingsScreen(
      * Déclaration des variables
      */
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("UserSettings", Context.MODE_PRIVATE)
+    val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", Context.MODE_PRIVATE)
     var editableUserName by remember { mutableStateOf(userName) }
     var editableTransportMode by remember { mutableStateOf(transportMode) }
     var editableAddress by remember { mutableStateOf(address) }
@@ -259,7 +259,7 @@ data class AddressSuggestion(val description: String, val placeId: String)
  */
 fun fetchAddressSuggestions(query: String, onSuggestionsFetched: (List<AddressSuggestion>) -> Unit) {
     val client = OkHttpClient()
-    val apiKey = "cle_api"
+    val apiKey = "CLE_API"
     val encodedQuery = query.replace(" ", "%20")
     val url = "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$encodedQuery&key=$apiKey"
     val request = Request.Builder().url(url).build()

@@ -41,10 +41,11 @@ class MainActivity : ComponentActivity() {
                 // Préferences pour sauvegarder les informations de l'utilisateur sur l'appli de SON appareil, elles sont encore là même si il quitte l'appli et revient
                 val sharedPreferences: SharedPreferences =
                     getSharedPreferences("OnTimeGoPrefs", Context.MODE_PRIVATE)
-                val storedUserName = sharedPreferences.getString("userName", null)
-                val storedTransportMode = sharedPreferences.getString("transportMode", null)
+                val storedUserName = sharedPreferences.getString("USER_NAME", null)
+                val storedTransportMode = sharedPreferences.getString("TRANSPORT_MODE", null)
                 val storedUserAddress = sharedPreferences.getString("userAddress", "")
-                val isSetupCompleteInitially = storedUserName != null && storedTransportMode != null
+                val isSetupCompleteInitially by remember { mutableStateOf(!storedUserName.isNullOrEmpty() && !storedTransportMode.isNullOrEmpty()) }
+                //val isSetupCompleteInitially = storedUserName != null && storedTransportMode != null
                 var currentScreen by remember { mutableStateOf(0) }
                 var userName by remember { mutableStateOf(storedUserName ?: "") }
                 var transportMode by remember { mutableStateOf(storedTransportMode ?: "") }
@@ -73,14 +74,18 @@ class MainActivity : ComponentActivity() {
                 if (!isSetupComplete) {
                     when (currentScreen) {
                         0 -> WelcomeScreen { name ->
-                            sharedPreferences.edit().putString("userName", name).apply()
-                            userName = name
-                            currentScreen = 1
+                            if (name.isNotEmpty()) {
+                                sharedPreferences.edit().putString("USER_NAME", name).apply()
+                                userName = name
+                                currentScreen = 1
+                            }
                         }
                         1 -> TransportModeScreen(userName) { mode ->
-                            sharedPreferences.edit().putString("transportMode", mode).apply()
-                            transportMode = mode
-                            isSetupComplete = true
+                            if (mode.isNotEmpty()) {
+                                sharedPreferences.edit().putString("TRANSPORT_MODE", mode).apply()
+                                transportMode = mode
+                                isSetupComplete = true
+                            }
                         }
                     }
                 } else {
@@ -90,7 +95,14 @@ class MainActivity : ComponentActivity() {
                         transportMode = transportMode,
                         userAddress = userAddress,
                         onScreenChange = { currentScreen = it },
-                        onUpdateSettings = ::updateUserSettings
+                        onUpdateSettings = { name, mode, address ->
+                            sharedPreferences.edit()
+                                .putString("USER_NAME", name)
+                                .putString("TRANSPORT_MODE", mode)
+                                .apply()
+                            userName = name
+                            transportMode = mode
+                        }
                     )
                 }
             }
