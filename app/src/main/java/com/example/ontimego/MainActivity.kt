@@ -2,6 +2,7 @@ package com.example.ontimego
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.icu.text.SimpleDateFormat
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +22,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ontimego.ui.theme.OnTimeGoTheme
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
@@ -45,7 +51,6 @@ class MainActivity : ComponentActivity() {
                 val storedTransportMode = sharedPreferences.getString("TRANSPORT_MODE", null)
                 val storedUserAddress = sharedPreferences.getString("userAddress", "")
                 val isSetupCompleteInitially by remember { mutableStateOf(!storedUserName.isNullOrEmpty() && !storedTransportMode.isNullOrEmpty()) }
-                //val isSetupCompleteInitially = storedUserName != null && storedTransportMode != null
                 var currentScreen by remember { mutableStateOf(0) }
                 var userName by remember { mutableStateOf(storedUserName ?: "") }
                 var transportMode by remember { mutableStateOf(storedTransportMode ?: "") }
@@ -94,6 +99,8 @@ class MainActivity : ComponentActivity() {
                         userName = userName,
                         transportMode = transportMode,
                         userAddress = userAddress,
+                        sharedPreferences = sharedPreferences,
+                        context = this,
                         onScreenChange = { currentScreen = it },
                         onUpdateSettings = { name, mode, address ->
                             sharedPreferences.edit()
@@ -124,13 +131,112 @@ fun MainScreen(
     userName: String,
     transportMode: String,
     userAddress: String,
+    sharedPreferences: SharedPreferences,
+    context: Context,
     onScreenChange: (Int) -> Unit,
     onUpdateSettings: (String, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
+    var selectedDate by remember { mutableStateOf("") }
     var routes by remember { mutableStateOf<List<Route>>(emptyList()) } // trajets proposés
-    var savedRoutes = remember { mutableStateListOf<Route>() } // trajets ajoutés
-    var selectedRoute = remember { mutableStateOf<Route>(Route(0,"","","","","","","","","","",0,"","", appointmentTime = "", userDepartureTime = "")) }
+    var selectedRoute = remember { mutableStateOf<Route>(Route(0,0L,"","","","","","","","","","0",0,"","", appointmentTime = "", userDepartureTime = "", selectedDate="")) }
+
+    /**
+     * Récupérer les itinéraires stockés dans les sharedPreferences
+     */
+    fun loadRoutesFromPreferences(sharedPreferences: SharedPreferences): MutableList<Route> {
+        val savedRoutesJson = sharedPreferences.getString("USER_ROUTES", "[]")
+        val jsonArray = JSONArray(savedRoutesJson)
+        val routes = mutableListOf<Route>()
+
+        for (i in 0 until jsonArray.length()) {
+            val routeJson = jsonArray.getJSONObject(i)
+            routes.add(Route.fromJson(routeJson))
+        }
+
+        return routes
+    }
+    val savedRoutes = remember {
+        mutableStateListOf<Route>().apply {
+            addAll(loadRoutesFromPreferences(sharedPreferences))
+        }
+    }
+
+    /**
+     * Enregistrer les itinéraires dans les sharedPreferences
+     */
+    fun saveRoutesToPreferences(routes: List<Route>, sharedPreferences: SharedPreferences) {
+        val jsonArray = JSONArray()
+        routes.forEach { route ->
+            jsonArray.put(route.toJson())
+        }
+        sharedPreferences.edit()
+            .putString("USER_ROUTES", jsonArray.toString())
+            .apply()
+    }
+    fun getRoutesFromPreferences(sharedPreferences: SharedPreferences): List<Route> {
+        val gson = Gson()
+        val jsonRoutes = sharedPreferences.getString("SAVED_ROUTES", null)
+        return if (jsonRoutes != null) {
+            val type = object : TypeToken<List<Route>>() {}.type
+            gson.fromJson(jsonRoutes, type)
+        } else {
+            emptyList()
+        }
+    }
+
+    /**
+     * S'occupe de la suppression des itinéraires et de leurs notifications associées
+     */
+    fun removeRoute(route: Route, sharedPreferences: SharedPreferences, context: Context) {
+        savedRoutes.remove(route)
+        saveRoutesToPreferences(savedRoutes, sharedPreferences)
+        cancelNotification(route, context)
+    }
+
+    /**
+     * Suppression des itinéraires qui sont passés
+     */
+    fun removeExpiredRoutes() {
+        val currentTimeMillis = System.currentTimeMillis()
+        val dateTimeFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+
+        val expiredRoutes = savedRoutes.filter { route ->
+            try {
+                val routeDateTimeString = "${selectedDate} ${route.appointmentTime}"
+                val routeDateTimeMillis = dateTimeFormat.parse(routeDateTimeString)?.time
+
+                routeDateTimeMillis != null && routeDateTimeMillis < currentTimeMillis
+            } catch (e: Exception) {
+                false
+            }
+        }
+        savedRoutes.removeAll(expiredRoutes)
+        saveRoutesToPreferences(savedRoutes, sharedPreferences)
+        expiredRoutes.forEach { route ->
+            cancelNotification(route, context)
+        }
+    }
+
+    /**
+     * Trier les itinéraires selon leur date et non pas leur ordre d'ajout
+     */
+    fun sortRoutesByDateAndTime(routes: List<Route>): List<Route> {
+        val dateTimeFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+
+        return routes.sortedBy { route ->
+            try {
+                dateTimeFormat.parse("${route.selectedDate} ${route.appointmentTime}")
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val loadedRoutes = getRoutesFromPreferences(sharedPreferences)
+        savedRoutes.addAll(loadedRoutes)
+    }
 
     Scaffold(
         topBar = {
@@ -144,13 +250,27 @@ fun MainScreen(
         }
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> HomeScreenPage(modifier = Modifier.padding(innerPadding), routes = savedRoutes)
+            0 -> {
+                removeExpiredRoutes()
+                val sortedRoutes = sortRoutesByDateAndTime(savedRoutes)
+                HomeScreenPage(
+                modifier = Modifier.padding(innerPadding),
+                routes = sortedRoutes,
+                selectedDate = selectedDate,
+                sharedPreferences = sharedPreferences,
+                onRemoveRoute = {
+                    route -> removeRoute(route, sharedPreferences, context) },
+                context = context
+            )}
+
             1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding),
                 locationManager = locationManager,
-                onRoutesFetched = { fetchedRoutes ->
+                onRoutesFetched = { fetchedRoutes, date ->
                     routes = fetchedRoutes
+                    selectedDate = date
                     selectedTab = 4 },
-                defaultAddress = userAddress
+                defaultAddress = userAddress,
+                favoriteTransportMode = transportMode,
             )
             2 -> ScheduleScreenPage(routes = savedRoutes,modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(
@@ -171,6 +291,9 @@ fun MainScreen(
                     selectedRoute.value = route
                     selectedTab = 5
                 },
+                onDelete = { route ->
+                    removeRoute(route, sharedPreferences, context)
+                },
                 routes = routes,
                 modifier = Modifier.padding(16.dp))
             5 -> ItineraireDetails(
@@ -178,8 +301,11 @@ fun MainScreen(
                 selectedRoute = selectedRoute.value,
                 onAddRoute = { route ->
                     savedRoutes.add(route)
+                    saveRoutesToPreferences(savedRoutes, sharedPreferences)
                     selectedTab = 0
-                }
+                },
+                sharedPreferences = sharedPreferences,
+                onRemoveRoute = { route -> removeRoute(route, sharedPreferences, context) }
             )
         }
     }

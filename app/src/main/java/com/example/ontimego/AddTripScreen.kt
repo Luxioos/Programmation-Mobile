@@ -39,6 +39,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import android.Manifest
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,12 +54,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 /**
  * Page de l'ajout de trajet sans contenu, vérification de la présence de l'autorisation système d'accès à la localisation
@@ -68,8 +73,9 @@ import java.util.TimeZone
 @Composable
 fun AddTripScreenPage(
     locationManager: LocationManager,
-    onRoutesFetched: (List<Route>) -> Unit,
+    onRoutesFetched: (List<Route>, String) -> Unit,
     defaultAddress: String,
+    favoriteTransportMode: String,
     modifier: Modifier = Modifier) { // Renamed function to avoid conflict
     val context = LocalContext.current
     var hasLocationPermission by remember { mutableStateOf(false) }
@@ -112,7 +118,11 @@ fun AddTripScreenPage(
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else if (hasLocationPermission) {
-                TripSetter(locationManager, onRoutesFetched, defaultAddress = defaultAddress)
+                TripSetter(
+                    locationManager,
+                    onRoutesFetched,
+                    defaultAddress = defaultAddress,
+                    defaultTransportMode = favoriteTransportMode)
             }
         }
     }
@@ -123,7 +133,8 @@ fun AddTripScreenPage(
  */
 
 data class Route(
-    val longArrivalTime : Long,
+    val id: Int,
+    val longArrivalTime: Long,
     val departureTime: String,
     val distance: String,
     val duration: String,
@@ -138,7 +149,58 @@ data class Route(
     val lineNumber: String,
     val vehicleType: String,
     val appointmentTime: String,
-    val userDepartureTime: String)
+    val userDepartureTime: String,
+    val selectedDate: String){
+    /**
+     * Utilisé pour les itinéraires à stocker dans les sharedPreferences
+     */
+    fun toJson(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("departureTime", departureTime)
+            put("startAddress", startAddress)
+            put("endAddress", endAddress)
+            put("direction", direction)
+            put("distance", distance)
+            put("duration", duration)
+            put("endStop", endStop)
+            put("lineNumber", lineNumber)
+            put("longArrivalTime", longArrivalTime)
+            put("nbStop", nbStop)
+            put("startStop", startStop)
+            put("transportArrivalTime", transportArrivalTime)
+            put("transportDepartTime", transportDepartTime)
+            put("userDepartureTime", userDepartureTime)
+            put("vehicleType", vehicleType)
+            put("appointmentTime", appointmentTime)
+            put("selectedDate", selectedDate)
+        }
+    }
+    companion object {
+        fun fromJson(json: JSONObject): Route {
+            return Route(
+                id = json.optInt("id", 0),
+                departureTime = json.optString("departureTime", ""),
+                startAddress = json.optString("startAddress", ""),
+                endAddress = json.optString("endAddress", ""),
+                direction = json.optString("direction", ""),
+                distance = json.optString("distance", ""),
+                duration = json.optString("duration", ""),
+                endStop = json.optString("endStop", ""),
+                lineNumber = json.optString("lineNumber", ""),
+                longArrivalTime = json.optLong("longArrivalTime", 0L),
+                nbStop = json.optInt("nbStop", 0),
+                startStop = json.optString("startStop", ""),
+                transportArrivalTime = json.optString("transportArrivalTime", ""),
+                transportDepartTime = json.optString("transportDepartTime", ""),
+                userDepartureTime = json.optString("userDepartureTime", ""),
+                vehicleType = json.optString("vehicleType", ""),
+                appointmentTime = json.optString("appointmentTime", ""),
+                selectedDate = json.optString("selectedDate", "")
+            )
+        }
+    }
+}
 
 /**
  * Récupération des infos de l'API Google Direction
@@ -153,6 +215,7 @@ fun getRoutes(
     departureTime: Long,
     selectedTime: String,
     arrivalTime: Long,
+    selectedDate: String,
     onResult: (List<Route>) -> Unit
 ) {
     CoroutineScope(Dispatchers.IO).launch {
@@ -197,7 +260,7 @@ fun getRoutes(
                                 var arrivalTransportTime = ""
                                 var departureTransportTime = ""
                                 var direction = ""
-                                var nbStop = 0
+                                var nbStop: Int? = null
                                 var lineNumber = ""
 
                                 for (j in 0 until steps.length()) {
@@ -210,42 +273,47 @@ fun getRoutes(
                                         departStop = transitDetails.getJSONObject("departure_stop").getString("name")
                                         departureTransportTime = transitDetails.getJSONObject("departure_time").getString("text")
                                         direction = transitDetails.getString("headsign")
-                                        nbStop = transitDetails.getInt("num_stops")
+                                        nbStop = transitDetails.optInt("num_stops", -1)
                                         val line = transitDetails.getJSONObject("line")
                                         lineNumber = line.optString("short_name", "N/A")
                                         vehicleType = line.getJSONObject("vehicle").getString("name")
                                     }
                                 }
-
-                                routeList.add(
-                                    Route(
-                                        longArrivalTime = arrivalTime,
-                                        departureTime = departureTransportTime,
-                                        distance = distance,
-                                        duration = duration,
-                                        transportDepartTime = departureTransportTime,
-                                        transportArrivalTime = arrivalTransportTime,
-                                        startAddress = startAddress,
-                                        endAddress = endAddress,
-                                        startStop = departStop,
-                                        endStop = arrivalStop,
-                                        direction = direction,
-                                        nbStop = nbStop,
-                                        lineNumber = lineNumber,
-                                        vehicleType = vehicleType,
-                                        appointmentTime = selectedTime,
-                                        userDepartureTime = calculateDepartureTime(
-                                            selectedTime,
-                                            parseDurationToSeconds(duration),
-                                            isTransit = true,
-                                            arrivalTime = arrivalTransportTime
+                                // Eviter d'afficher les trajets inadaptés proposés par Maps
+                                if (nbStop != null && nbStop > 0){
+                                    routeList.add(
+                                        Route(
+                                            id=0,
+                                            longArrivalTime = arrivalTime,
+                                            departureTime = departureTransportTime,
+                                            distance = distance,
+                                            duration = duration,
+                                            transportDepartTime = departureTransportTime,
+                                            transportArrivalTime = arrivalTransportTime,
+                                            startAddress = startAddress,
+                                            endAddress = endAddress,
+                                            startStop = departStop,
+                                            endStop = arrivalStop,
+                                            direction = direction,
+                                            nbStop = nbStop,
+                                            lineNumber = lineNumber.toString(),
+                                            vehicleType = vehicleType.toString(),
+                                            appointmentTime = selectedTime,
+                                            userDepartureTime = calculateDepartureTime(
+                                                selectedTime,
+                                                parseDurationToSeconds(duration),
+                                                isTransit = true,
+                                                arrivalTime = arrivalTransportTime
+                                            ),
+                                            selectedDate = selectedDate
                                         )
                                     )
-                                )
+                                }
                             } else {
                                 // Pour les modes non transit : driving, walking, bicycling
                                 routeList.add(
                                     Route(
+                                        id = 0,
                                         longArrivalTime = arrivalTime,
                                         departureTime = "",
                                         distance = distance,
@@ -265,7 +333,8 @@ fun getRoutes(
                                             appointmentTime = selectedTime,
                                             durationInSeconds = parseDurationToSeconds(duration),
                                             isTransit = false
-                                        )
+                                        ),
+                                        selectedDate = selectedDate
                                     )
                                 )
                             }
@@ -332,8 +401,9 @@ fun geocodeAddress(address: String, onResult: (Double?, Double?) -> Unit) {
 @Composable
 fun TripSetter(
     locationManager: LocationManager,
-    onRoutesFetched: (List<Route>) -> Unit,
-    defaultAddress: String) {
+    onRoutesFetched: (List<Route>, String) -> Unit,
+    defaultAddress: String,
+    defaultTransportMode: String) {
     /**
      * Déclaration des variables
      */
@@ -347,8 +417,8 @@ fun TripSetter(
     var selectedFrequency by remember { mutableStateOf(frequence[0]) }
     var expandedFrequency by remember { mutableStateOf(false) }
 
-    val transport = arrayOf("Voiture","Transport en commun","Marche", "Vélo")
-    var selectedTransport by remember {mutableStateOf(transport[0])}
+    val transport = arrayOf("Voiture","Bus","Marche", "Vélo")
+    var selectedTransport by remember { mutableStateOf(defaultTransportMode) }
     var expandedTransport by remember {mutableStateOf(false)}
 
     var selectedDate by remember { mutableStateOf("") }
@@ -628,6 +698,8 @@ fun TripSetter(
 
                 if (missingFields.isNotEmpty()) {
                     errorMessage = "Veuillez remplir le(s) champ(s) : ${missingFields.joinToString(", ")}"
+                } else if (!isDateTimeValid(selectedDate, selectedTime)) {
+                    errorMessage = "La date de la recherche demandée est dépassée."
                 } else {
                     errorMessage = ""
                     if (!hasNotificationPermission) {
@@ -652,7 +724,8 @@ fun TripSetter(
                                         mode,
                                         arrivalTime,
                                         selectedTime,
-                                        arrivalTime
+                                        arrivalTime,
+                                        selectedDate
                                     ) { routes ->
                                         val uniqueRoutes = removeDuplicateRoutes(routes)
                                         val enrichedRoutes = uniqueRoutes.map { route ->
@@ -666,7 +739,16 @@ fun TripSetter(
                                                 )
                                             )
                                         }
-                                        onRoutesFetched(enrichedRoutes)
+                                        enrichedRoutes.forEach { route ->
+                                            val departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime)
+                                            scheduleNotification(
+                                                routeName = "${route.startAddress} → ${route.endAddress}",
+                                                departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime),
+                                                location = route.startAddress,
+                                                context = context
+                                            )
+                                        }
+                                        onRoutesFetched(enrichedRoutes, selectedDate)
                                         isLoading = false
                                     }
                                 }else{
@@ -823,3 +905,54 @@ fun convertToTimestamp(date: String, time: String): Long {
     // Retourner le timestamp UNIX en secondes
     return dateTime?.time?.div(1000) ?: throw IllegalArgumentException("Date ou heure invalide")
 }
+
+/**
+ * Pour programmer une notification pour les itinéraires
+ */
+fun scheduleNotification(routeName: String, departureTimeMillis: Long, location: String, context: Context) {
+    val currentTimeMillis = System.currentTimeMillis()
+    val delayMillis = departureTimeMillis - currentTimeMillis - TimeUnit.HOURS.toMillis(1)
+
+    if (delayMillis > 0) {
+        val workData = Data.Builder()
+            .putString("routeName", routeName)
+            .putString("departureTime", departureTimeMillis.toString())
+            .putString("location", location)
+            .build()
+
+        val notificationRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setInputData(workData)
+            .build()
+
+        WorkManager.getInstance(context).enqueue(notificationRequest)
+    }
+}
+
+/**
+ * Vérifier si la date et l'heure entrées par l'utilisateur ne sont pas antérieures aux date et heure actuelles
+ */
+fun isDateTimeValid(selectedDate: String, selectedTime: String): Boolean {
+    val currentDateTime = Calendar.getInstance()
+    val dateTimeFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+    return try {
+        val selectedDateTime = dateTimeFormat.parse("$selectedDate $selectedTime")
+        val selectedDateOnly = dateFormat.parse(selectedDate)
+
+        if (selectedDateTime != null) {
+            if (selectedDateOnly != null && selectedDateOnly == dateFormat.parse(dateFormat.format(currentDateTime.time))) {
+                !selectedDateTime.before(currentDateTime.time)
+            } else {
+                !selectedDateTime.before(currentDateTime.time)
+            }
+        } else {
+            false
+        }
+    } catch (e: Exception) {
+        false
+    }
+}
+
+

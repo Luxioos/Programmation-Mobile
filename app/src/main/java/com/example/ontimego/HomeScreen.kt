@@ -1,6 +1,7 @@
 package com.example.ontimego
 
-import androidx.compose.foundation.layout.Arrangement
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,36 +20,48 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 @Composable
-fun HomeScreenPage(modifier: Modifier = Modifier, routes: List<Route>) {
+fun HomeScreenPage(
+    modifier: Modifier = Modifier,
+    routes: List<Route>,
+    sharedPreferences: SharedPreferences,
+    selectedDate: String,
+    onRemoveRoute: (Route) -> Unit,
+    context: Context
+) {
+    LaunchedEffect(routes, selectedDate) {
+        scheduleNotificationForRoutes(routes, selectedDate, context)
+    }
     Scaffold(
         topBar = {
             AppTopBar(title = "Accueil")
         },
         bottomBar = {
-            NavigationBar(selectedTab = 0) { } // Menu de navigation
+            NavigationBar(selectedTab = 0) { }
         }
     ) {
         Box(modifier = modifier.padding(it)) {
-            HomeContent(routes)
+            HomeContent(routes, onRemoveRoute, context)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(routes: List<Route>) {
+fun HomeContent(routes: List<Route>, onRemoveRoute: (Route) -> Unit, context: Context) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -99,10 +112,75 @@ fun HomeContent(routes: List<Route>) {
                         RouteCard(
                             route = route,
                             modifier = Modifier.fillMaxWidth(),
-                            onViewDetails = { }
+                            onViewDetails = { },
+                            onDelete = {
+                                onRemoveRoute(route)
+                                cancelNotification(route, context) },
+                            showDeleteIcon = true
                         )
                     }
                 }
             }
         }
 }
+
+/**
+ * Programmer une notification à chaque ajout d'itinéraire
+ */
+fun scheduleNotificationForRoutes(routes: List<Route>, selectedDate: String, context: android.content.Context) {
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    dateFormat.timeZone = TimeZone.getDefault()
+
+    val sharedPreferences = context.getSharedPreferences("OnTimeGoPrefs", Context.MODE_PRIVATE)
+    val plannedNotifications = sharedPreferences.getStringSet("PLANNED_NOTIFICATIONS", mutableSetOf()) ?: mutableSetOf()
+
+    routes.forEach { route ->
+        val appointmentTime = route.appointmentTime.trim()
+        try {
+            val completeAppointmentTime = "${selectedDate.trim()} ${appointmentTime.trim()}"
+
+            val appointmentDate = dateFormat.parse(completeAppointmentTime)
+            val appointmentTimeMillis = appointmentDate?.time ?: return@forEach
+
+            val currentTimeMillis = System.currentTimeMillis()
+            val delayMillis = appointmentTimeMillis - currentTimeMillis - TimeUnit.HOURS.toMillis(1)
+
+            val notificationId = "${selectedDate}_${appointmentTime}_${route.endAddress}"
+
+            if (!plannedNotifications.contains(notificationId) && delayMillis > 0){
+                plannedNotifications.add(notificationId)
+                sharedPreferences.edit()
+                    .putStringSet("PLANNED_NOTIFICATIONS", plannedNotifications)
+                    .apply()
+
+                val workData = Data.Builder()
+                    .putString("endAddress", route.endAddress)
+                    .putString("appointmentTime", appointmentTime)
+                    .build()
+
+                val notificationRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+                    .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+                    .addTag(route.generateNotificationTag())
+                    .setInputData(workData)
+                    .build()
+
+                WorkManager.getInstance(context).enqueue(notificationRequest)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+/**
+ * Fonctions pour la supression de notifications programmées lors de la suppression d'un itinéraire
+ */
+fun Route.generateNotificationTag(): String {
+    return "Notification_${this.startAddress}_${this.endAddress}_${this.userDepartureTime}"
+}
+fun cancelNotification(route: Route, context: Context) {
+    val tag = route.generateNotificationTag()
+    WorkManager.getInstance(context).cancelAllWorkByTag(tag)
+}
+
+

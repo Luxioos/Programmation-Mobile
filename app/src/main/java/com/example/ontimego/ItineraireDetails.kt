@@ -1,5 +1,6 @@
 package com.example.ontimego
 
+import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +17,13 @@ import androidx.compose.ui.Modifier
 
 
 @Composable
-fun ItineraireDetails(modifier: Modifier = Modifier, selectedRoute: Route, onAddRoute: (Route) -> Unit)
-{
+fun ItineraireDetails(
+    modifier: Modifier = Modifier,
+    selectedRoute: Route,
+    onAddRoute: (Route) -> Unit,
+    onRemoveRoute: (Route) -> Unit,
+    sharedPreferences: SharedPreferences
+) {
     Scaffold(
         topBar = {
             AppTopBar(title = "Itinéraires proposés")
@@ -42,7 +48,10 @@ fun ItineraireDetails(modifier: Modifier = Modifier, selectedRoute: Route, onAdd
                     route = selectedRoute,
                     modifier = Modifier
                         .fillMaxSize(),
-                    onViewDetails = {}
+                    onViewDetails = {},
+                    onDelete = { route ->
+                        onRemoveRoute(route)
+                    }
                 )
             }
         }
