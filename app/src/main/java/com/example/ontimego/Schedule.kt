@@ -71,6 +71,9 @@ import kotlin.math.roundToInt
 
 val EventTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
+/**
+ * Composable représentant un évènement de l'emploi du temps
+ */
 @Composable
 fun BasicEvent(
     event: Event,
@@ -174,6 +177,9 @@ fun ScheduleSidebar(
     }
 }
 
+/**
+ * Emploi du temps complet
+ */
 @Composable
 fun Schedule(
     routes: List<Route>,
@@ -197,20 +203,6 @@ fun Schedule(
         var endTime = convertTimestampToISO8601(arrivalTime)
 
 
-
-        Log.i("TAG","depart : " + startTime)
-        Log.i("TAG","arrivée : " + endTime)
-
-
-        /*
-        val newEvent = Event(
-            name = "Trajet",
-            color = Color(0xFFAFBBF2),
-            start = LocalDateTime.parse("2021-05-18T09:00:00"),
-            end = LocalDateTime.parse("2021-05-18T11:00:00"),
-            description = "Moyen de transport : " + route.vehicleType,
-        )
-        */
 
         val newEvent = Event(
             name = route.endAddress,
@@ -326,6 +318,10 @@ fun BasicSchedule(
     }
 }
 
+/**
+ * Classe des éléments qui composent l'emploi du temps
+ */
+
 data class Event(
     val name: String,
     val color: Color,
@@ -333,6 +329,10 @@ data class Event(
     val end: LocalDateTime,
     val description: String? = null,
 )
+
+/**
+ * Fonctions utilitaires pour conversions d'heure
+ */
 
 fun convertTimestampToISO8601(timestamp: Long): String {
     val instant = Instant.ofEpochMilli(timestamp)

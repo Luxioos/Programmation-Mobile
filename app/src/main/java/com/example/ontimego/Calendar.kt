@@ -19,6 +19,9 @@ import androidx.compose.ui.res.painterResource
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 import java.util.*
 
+/**
+ * Récupération de l'heure par l'utilisateur
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatePicker() {
