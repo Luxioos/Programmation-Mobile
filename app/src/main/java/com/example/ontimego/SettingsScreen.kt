@@ -56,6 +56,7 @@ fun SettingsScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     var isAddressSelected by remember { mutableStateOf(false) }
     var hasInteractedWithAddress by remember { mutableStateOf(false) }
+    var addressQueryDelay by remember { mutableStateOf(0L) }
 
     /**
      * Quand une adresse est cliquée/sélectionnée dans la liste des suggestions
@@ -79,13 +80,16 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(editableAddress, hasInteractedWithAddress) {
-        if (editableAddress.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
-            fetchAddressSuggestions(editableAddress) { suggestions ->
+        if (System.currentTimeMillis() - addressQueryDelay > 300) {
+            addressQueryDelay = System.currentTimeMillis()
+            if (editableAddress.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
+                fetchAddressSuggestions(editableAddress) { suggestions ->
+                    addressSuggestions.clear()
+                    addressSuggestions.addAll(suggestions)
+                }
+            } else {
                 addressSuggestions.clear()
-                addressSuggestions.addAll(suggestions)
             }
-        } else {
-            addressSuggestions.clear()
         }
     }
 
@@ -179,6 +183,19 @@ fun SettingsScreen(
             },
             label = { Text("Adresse") },
             modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                if (editableAddress.isNotEmpty()) {
+                    IconButton(onClick = {
+                        editableAddress = ""
+                        addressSuggestions.clear()
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.baseline_clear_24),
+                            contentDescription = "Effacer l'adresse"
+                        )
+                    }
+                }
+            },
             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
                 onDone = {

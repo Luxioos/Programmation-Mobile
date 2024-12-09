@@ -42,15 +42,20 @@ import android.Manifest
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -59,6 +64,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -76,7 +83,12 @@ fun AddTripScreenPage(
     onRoutesFetched: (List<Route>, String) -> Unit,
     defaultAddress: String,
     favoriteTransportMode: String,
-    modifier: Modifier = Modifier) { // Renamed function to avoid conflict
+    modifier: Modifier = Modifier,
+    selectedFrequency: MutableState<String?>,
+    name: MutableState<String?>,
+    untilDate: MutableState<String?>
+    ) { // Renamed function to avoid conflict
+
     val context = LocalContext.current
     var hasLocationPermission by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
@@ -120,9 +132,16 @@ fun AddTripScreenPage(
             } else if (hasLocationPermission) {
                 TripSetter(
                     locationManager,
-                    onRoutesFetched,
+                    onRoutesFetched = { fetchedRoutes, date ->
+                        println("Nom actuel transmis : ${name.value}") // Debug
+                        onRoutesFetched(fetchedRoutes, date)
+                    },
                     defaultAddress = defaultAddress,
-                    defaultTransportMode = favoriteTransportMode)
+                    defaultTransportMode = favoriteTransportMode,
+                    onFrequencySelected = { frequency -> selectedFrequency.value = frequency },
+                    onUntilDateSelected = { date -> untilDate.value = date },
+                    onNameSelected = { name.value = it }
+                )
             }
         }
     }
@@ -150,7 +169,12 @@ data class Route(
     val vehicleType: String,
     val appointmentTime: String,
     val userDepartureTime: String,
-    val selectedDate: String){
+    val frequency: String? = null,
+    val untilDate: String? = null,
+    val endAddressLat: String? = null,
+    val endAddressLng: String? = null,
+    val selectedDate: String,
+    val name: String? = ""){
     /**
      * Utilisé pour les itinéraires à stocker dans les sharedPreferences
      */
@@ -174,6 +198,7 @@ data class Route(
             put("vehicleType", vehicleType)
             put("appointmentTime", appointmentTime)
             put("selectedDate", selectedDate)
+            put("name", name)
         }
     }
     companion object {
@@ -196,7 +221,8 @@ data class Route(
                 userDepartureTime = json.optString("userDepartureTime", ""),
                 vehicleType = json.optString("vehicleType", ""),
                 appointmentTime = json.optString("appointmentTime", ""),
-                selectedDate = json.optString("selectedDate", "")
+                selectedDate = json.optString("selectedDate", ""),
+                name = json.optString("name", "")
             )
         }
     }
@@ -216,6 +242,7 @@ fun getRoutes(
     selectedTime: String,
     arrivalTime: Long,
     selectedDate: String,
+    name: String?,
     onResult: (List<Route>) -> Unit
 ) {
     CoroutineScope(Dispatchers.IO).launch {
@@ -305,8 +332,8 @@ fun getRoutes(
                                                 isTransit = true,
                                                 arrivalTime = arrivalTransportTime
                                             ),
-                                            selectedDate = selectedDate
-                                        )
+                                            selectedDate = selectedDate,
+                                            name = name ?: "")
                                     )
                                 }
                             } else {
@@ -334,7 +361,8 @@ fun getRoutes(
                                             durationInSeconds = parseDurationToSeconds(duration),
                                             isTransit = false
                                         ),
-                                        selectedDate = selectedDate
+                                        selectedDate = selectedDate,
+                                        name = name ?: ""
                                     )
                                 )
                             }
@@ -403,7 +431,10 @@ fun TripSetter(
     locationManager: LocationManager,
     onRoutesFetched: (List<Route>, String) -> Unit,
     defaultAddress: String,
-    defaultTransportMode: String) {
+    defaultTransportMode: String,
+    onFrequencySelected: (String) -> Unit,
+    onUntilDateSelected: (String) -> Unit,
+    onNameSelected: (String) -> Unit) {
     /**
      * Déclaration des variables
      */
@@ -412,10 +443,16 @@ fun TripSetter(
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var debounceJob: Job? = null
+    var routeName by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
 
-    val frequence = arrayOf("Unique","Journalier","Jour de la semaine","Week-end","Hebdomadaire")
+    val frequence = arrayOf("Unique","Journalier","Hebdomadaire", "Mensuel")
     var selectedFrequency by remember { mutableStateOf(frequence[0]) }
     var expandedFrequency by remember { mutableStateOf(false) }
+    var untilDate by remember { mutableStateOf("") }
+    var showUntilDatePicker by remember { mutableStateOf(false) }
+    val isUntilDateEnabled = selectedFrequency != "Unique"
 
     val transport = arrayOf("Voiture","Bus","Marche", "Vélo")
     var selectedTransport by remember { mutableStateOf(defaultTransportMode) }
@@ -467,13 +504,17 @@ fun TripSetter(
      */
 
     LaunchedEffect(selectedAdresse, hasInteractedWithAddress) {
-        if (selectedAdresse.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
-            fetchAddressSuggestions(selectedAdresse) { suggestions ->
+        debounceJob?.cancel()
+        debounceJob = launch {
+            delay(300) // limiter les appels API
+            if (selectedAdresse.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
+                fetchAddressSuggestions(selectedAdresse) { suggestions ->
+                    addressSuggestions.clear()
+                    addressSuggestions.addAll(suggestions)
+                }
+            } else if (isAddressSelected) {
                 addressSuggestions.clear()
-                addressSuggestions.addAll(suggestions)
             }
-        } else if (isAddressSelected) {
-            addressSuggestions.clear()
         }
     }
 
@@ -493,15 +534,27 @@ fun TripSetter(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    modifier = Modifier.padding(bottom = 2.dp)
+                    modifier = Modifier
+                        .padding(bottom = 2.dp)
+                        .fillMaxWidth()
                 )
             }
-            Text(text = "Sélectionner une date")
+            Text("Nom de l'itinéraire")
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Entrez un nom") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = "Sélectionner une date", modifier = Modifier.fillMaxWidth())
             OutlinedTextField(
                 value = selectedDate,
                 onValueChange = { selectedDate = it },
                 label = { Text("Date") },
-                modifier = Modifier,
+                modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     IconButton(onClick = { showCalendar = true }) {
                         Icon(
@@ -527,20 +580,92 @@ fun TripSetter(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            /**
+             * Entrée de la fréquence de l'itinéraire recherché
+             */
             Text("Fréquence du trajet")
+
             Spacer(modifier = Modifier.height(8.dp))
-            ExposedDropdownMenuBox(
-                expanded = expandedFrequency,
-                onExpandedChange = {
-                    expandedFrequency = !expandedFrequency
-                },
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TextField(
-                    value = selectedFrequency,
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFrequency) },
-                    modifier = Modifier.menuAnchor(),
+                ExposedDropdownMenuBox(
+                    expanded = expandedFrequency,
+                    onExpandedChange = {
+                        expandedFrequency = !expandedFrequency
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    TextField(
+                        value = selectedFrequency,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFrequency) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                keyboardController?.hide()
+                            }
+                        )
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expandedFrequency,
+                        onDismissRequest = { expandedFrequency = false }
+                    ) {
+                        frequence.forEach { item ->
+                            DropdownMenuItem(
+                                text = { Text(text = item) },
+                                onClick = {
+                                    selectedFrequency = item
+                                    expandedFrequency = false
+                                    onFrequencySelected(item)
+                                    if (item == "Unique") {
+                                        untilDate = ""
+                                        onUntilDateSelected(null.toString())
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                OutlinedTextField(
+                    value = untilDate,
+                    onValueChange = { newValue ->
+                        untilDate = newValue
+                        onUntilDateSelected(newValue)
+                    },
+                    enabled = isUntilDateEnabled,
+                    label = { Text("Jusqu'à") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clickable (enabled = isUntilDateEnabled) { showUntilDatePicker = true },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                if (isUntilDateEnabled) showUntilDatePicker = true
+                            },
+                            enabled = isUntilDateEnabled
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.calendar),
+                                contentDescription = "Sélectionner une date"
+                            )
+                        }
+                    },
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(
                         onDone = {
@@ -548,20 +673,12 @@ fun TripSetter(
                         }
                     )
                 )
-
-                ExposedDropdownMenu(
-                    expanded = expandedFrequency,
-                    onDismissRequest = { expandedFrequency = false }
-                ) {
-                    frequence.forEach { item ->
-                        DropdownMenuItem(
-                            text = { Text(text = item) },
-                            onClick = {
-                                selectedFrequency = item
-                                expandedFrequency = false
-                            }
-                        )
-                    }
+                if (showUntilDatePicker) {
+                    CalendarDialog(onDateSelected = { date ->
+                        untilDate = date
+                        showUntilDatePicker = false
+                        onUntilDateSelected(date)
+                    })
                 }
             }
 
@@ -576,6 +693,19 @@ fun TripSetter(
                 },
                 label = { Text("Adresse") },
                 modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    if (selectedAdresse.isNotBlank()) {
+                        IconButton(onClick = {
+                            selectedAdresse = ""
+                            addressSuggestions.clear()
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_clear_24),
+                                contentDescription = "Effacer l'adresse"
+                            )
+                        }
+                    }
+                },
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = {
@@ -612,7 +742,7 @@ fun TripSetter(
                 value = selectedTime,
                 onValueChange = { selectedTime = it },
                 label = { Text("Heure") },
-                modifier = Modifier,
+                modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     IconButton(onClick = { showTime = true }) {
                         Icon(
@@ -657,13 +787,16 @@ fun TripSetter(
                 onExpandedChange = {
                     expandedTransport = !expandedTransport
                 },
+                modifier = Modifier.fillMaxWidth()
             ) {
                 TextField(
                     value = selectedTransport,
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedTransport) },
-                    modifier = Modifier.menuAnchor(),
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(
                         onDone = {
@@ -674,7 +807,8 @@ fun TripSetter(
 
                 ExposedDropdownMenu(
                     expanded = expandedTransport,
-                    onDismissRequest = { expandedTransport = false }
+                    onDismissRequest = { expandedTransport = false },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     transport.forEach { item ->
                         DropdownMenuItem(
@@ -691,11 +825,14 @@ fun TripSetter(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(onClick = {
+                if (name.isNotBlank()) {
+                    onNameSelected(name)
+                }
                 val missingFields = mutableListOf<String>()
                 if (selectedDate.isBlank()) missingFields.add("Date")
                 if (selectedAdresse.isBlank()) missingFields.add("Adresse")
                 if (selectedTime.isBlank()) missingFields.add("Heure")
-
+                if (name.isBlank()) missingFields.add("Nom")
                 if (missingFields.isNotEmpty()) {
                     errorMessage = "Veuillez remplir le(s) champ(s) : ${missingFields.joinToString(", ")}"
                 } else if (!isDateTimeValid(selectedDate, selectedTime)) {
@@ -704,7 +841,7 @@ fun TripSetter(
                     errorMessage = ""
                     if (!hasNotificationPermission) {
                         requestNotificationPermission()
-                    } else{
+                    } else {
                         isLoading = true
                         locationManager.getCurrentLocation { originLat, originLng ->
                             geocodeAddress(selectedAdresse) { destLat, destLng ->
@@ -715,7 +852,6 @@ fun TripSetter(
                                     else if (selectedTransport == "Vélo") mode = "bicycling"
                                     else mode = "transit"
                                     val arrivalTime = convertToTimestamp(selectedDate, selectedTime)
-                                    //val departureTime = convertToTimestamp(selectedDate, selectedTime)
                                     getRoutes(
                                         originLat,
                                         originLng,
@@ -725,12 +861,14 @@ fun TripSetter(
                                         arrivalTime,
                                         selectedTime,
                                         arrivalTime,
-                                        selectedDate
+                                        selectedDate,
+                                        name = name
                                     ) { routes ->
                                         val uniqueRoutes = removeDuplicateRoutes(routes)
-                                        val enrichedRoutes = uniqueRoutes.map { route ->
+                                        val enrichedRoutes = routes.map { route ->
                                             route.copy(
                                                 appointmentTime = selectedTime,
+                                                name = name,
                                                 userDepartureTime = calculateDepartureTime(
                                                     appointmentTime = selectedTime,
                                                     durationInSeconds = parseDurationToSeconds(route.duration),
@@ -740,10 +878,13 @@ fun TripSetter(
                                             )
                                         }
                                         enrichedRoutes.forEach { route ->
-                                            val departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime)
+                                            //val departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime)
                                             scheduleNotification(
                                                 routeName = "${route.startAddress} → ${route.endAddress}",
-                                                departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime),
+                                                departureTimeMillis = convertToTimestamp(
+                                                    selectedDate,
+                                                    route.userDepartureTime
+                                                ),
                                                 location = route.startAddress,
                                                 context = context
                                             )
@@ -751,16 +892,14 @@ fun TripSetter(
                                         onRoutesFetched(enrichedRoutes, selectedDate)
                                         isLoading = false
                                     }
-                                }else{
+                                } else {
                                     isLoading = false
                                 }
                             }
+                        }
                     }
                 }
-            }
-            }) {
-                Text(text = "Voir les trajets")
-            }
+            }) { Text(text = "Voir les trajets") }
         }
     }
     if (isLoading) {
@@ -770,7 +909,7 @@ fun TripSetter(
                 .background(Color.Black.copy(alpha = 0.5f))
                 .clickable(enabled = false) {}
         ) {
-            CircularProgressIndicator( // Roue de chargement lors de la récupération des itinéraires
+            CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.primary,
                 strokeWidth = 4.dp
@@ -782,7 +921,6 @@ fun TripSetter(
 /**
  * Convertir une durée en secondes, utilisé pour trouver l'heure de départ conseillée
  */
-
 fun parseDurationToSeconds(duration: String): Long {
     val regex = Regex("(\\d+)\\s*(hour|hours|hr|hrs)?\\s*(\\d+)?\\s*(minute|minutes|min|mins)?")
     val match = regex.find(duration)

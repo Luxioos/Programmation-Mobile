@@ -1,5 +1,6 @@
 package com.example.ontimego
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.icu.text.SimpleDateFormat
@@ -33,7 +34,11 @@ class MainActivity : ComponentActivity() {
     private var userName: String? = null
     private var transportMode: String? = null
     private lateinit var locationManager: LocationManager
+    private var selectedFrequency = mutableStateOf<String?>("Unique")
+    private var untilDate = mutableStateOf<String?>(null)
+    private var name = mutableStateOf<String?>("")
 
+    @SuppressLint("UnrememberedMutableState")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -109,7 +114,10 @@ class MainActivity : ComponentActivity() {
                                 .apply()
                             userName = name
                             transportMode = mode
-                        }
+                        },
+                        selectedFrequency = selectedFrequency,
+                        untilDate = untilDate,
+                        name = name
                     )
                 }
             }
@@ -134,6 +142,9 @@ fun MainScreen(
     sharedPreferences: SharedPreferences,
     context: Context,
     onScreenChange: (Int) -> Unit,
+    selectedFrequency: MutableState<String?>,
+    untilDate: MutableState<String?>,
+    name: MutableState<String?>,
     onUpdateSettings: (String, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -263,7 +274,8 @@ fun MainScreen(
                 context = context
             )}
 
-            1 -> AddTripScreenPage(modifier = Modifier.padding(innerPadding),
+            1 -> AddTripScreenPage(
+                modifier = Modifier.padding(innerPadding),
                 locationManager = locationManager,
                 onRoutesFetched = { fetchedRoutes, date ->
                     routes = fetchedRoutes
@@ -271,6 +283,9 @@ fun MainScreen(
                     selectedTab = 4 },
                 defaultAddress = userAddress,
                 favoriteTransportMode = transportMode,
+                selectedFrequency = selectedFrequency,
+                untilDate = untilDate,
+                name = name
             )
             2 -> ScheduleScreenPage(routes = savedRoutes,modifier = Modifier.padding(innerPadding))
             3 -> SettingsScreen(
@@ -295,17 +310,23 @@ fun MainScreen(
                     removeRoute(route, sharedPreferences, context)
                 },
                 routes = routes,
+                frequency = selectedFrequency.value,
+                untilDate = untilDate.value,
+                name = name.value,
                 modifier = Modifier.padding(16.dp))
             5 -> ItineraireDetails(
                 modifier = Modifier.padding(16.dp),
                 selectedRoute = selectedRoute.value,
+                sharedPreferences = sharedPreferences,
+                onRemoveRoute = { route -> removeRoute(route, sharedPreferences, context) },
+                frequency = selectedFrequency.value,
+                untilDate = untilDate.value,
+                locationManager = locationManager,
                 onAddRoute = { route ->
                     savedRoutes.add(route)
                     saveRoutesToPreferences(savedRoutes, sharedPreferences)
-                    selectedTab = 0
                 },
-                sharedPreferences = sharedPreferences,
-                onRemoveRoute = { route -> removeRoute(route, sharedPreferences, context) }
+                onScreenChange = { selectedTab = it }
             )
         }
     }

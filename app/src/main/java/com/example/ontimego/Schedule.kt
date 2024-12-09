@@ -23,6 +23,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +64,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -69,7 +75,7 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 
-val EventTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+val EventTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
  * Composable représentant un évènement de l'emploi du temps
@@ -118,35 +124,42 @@ private val DayFormatter = DateTimeFormatter.ofPattern("EE, MMM d")
 @Composable
 fun BasicDayHeader(
     day: LocalDate,
+    isHighlighted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Text(
         text = day.format(DayFormatter),
         textAlign = TextAlign.Center,
+        color = if (isHighlighted) MaterialTheme.colorScheme.primary else Color.Black,
         modifier = modifier
             .fillMaxWidth()
             .padding(4.dp)
+            .background(if (isHighlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
     )
 }
 
 @Composable
 fun ScheduleHeader(
+    currentWeekStart: LocalDate,
     minDate: LocalDate,
     maxDate: LocalDate,
     dayWidth: Dp,
+    highlightedDates: Set<LocalDate>,
     modifier: Modifier = Modifier,
-    dayHeader: @Composable (day: LocalDate) -> Unit = { BasicDayHeader(day = it) },
+    dayHeader: @Composable (LocalDate, Boolean) -> Unit = { day, isHighlighted ->
+        BasicDayHeader(day = day, isHighlighted = isHighlighted)
+    },
 ) {
     Row(modifier = modifier) {
-        val numDays = ChronoUnit.DAYS.between(minDate, maxDate).toInt() + 1
-        repeat(numDays) { i ->
+        (0..6).forEach { offset ->
+            val currentDate = currentWeekStart.plusDays(offset.toLong())
             Box(modifier = Modifier.width(dayWidth)) {
-                dayHeader(minDate.plusDays(i.toLong()))
+                dayHeader(currentDate, highlightedDates.contains(currentDate))
             }
         }
     }
 }
-private val HourFormatter = DateTimeFormatter.ofPattern("h a")
+val HourFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
 
 @Composable
 fun BasicSidebarLabel(
@@ -184,52 +197,49 @@ fun ScheduleSidebar(
 fun Schedule(
     routes: List<Route>,
     modifier: Modifier = Modifier,
-    eventContent: @Composable (event: Event) -> Unit = { BasicEvent(event = it) },
-    dayHeader: @Composable (day: LocalDate) -> Unit = { BasicDayHeader(day = it) },
+    eventContent: @Composable (event: Event) -> Unit = { BasicEvent(event = it) }
 ) {
+    var selectedEvent by remember { mutableStateOf<Event?>(null) }
+    val today = LocalDate.now()
+    var currentWeekStart by remember { mutableStateOf(today.minusDays((today.dayOfWeek.value - 1).toLong())) }
 
-    var events = mutableListOf<Event>()
-    for(route in routes){
-
-        Log.i("TAG","depart : " + route.departureTime)
-        Log.i("TAG","depart : " + route.duration)
-
-        var arrivalTime = route.longArrivalTime*1000
-        var duration = convertDurationStringToTimestamp(route.duration)
-
-        var departTime = arrivalTime - duration
-
-        var startTime = convertTimestampToISO8601(departTime)
-        var endTime = convertTimestampToISO8601(arrivalTime)
-
-
-
-        val newEvent = Event(
+    val events = routes.map { route ->
+        val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.getDefault())
+        val currentDate = route.selectedDate
+        val startTime = LocalDateTime.parse("$currentDate ${route.userDepartureTime}", formatter)
+        val endTime = LocalDateTime.parse("$currentDate ${route.appointmentTime}", formatter)
+        Event(
             name = route.endAddress,
+            nameR = route.name,
             color = Color(0xFFAFBBF2),
-            start = LocalDateTime.parse(startTime),
-            end = LocalDateTime.parse(endTime),
-            description = "Moyen de transport : " + route.vehicleType,
+            start = startTime,
+            end = endTime,
+            description = "Moyen de transport : ${route.vehicleType} ${route.lineNumber}"
         )
-
-        events.add(newEvent)
     }
 
-
-    var minDate = events.minByOrNull(Event::start)!!.start.toLocalDate()
-    var maxDate = events.maxByOrNull(Event::end)!!.end.toLocalDate()
-
     val dayWidth = 256.dp
-    val hourHeight = 64.dp
+    val hourHeight = 96.dp
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     var sidebarWidth by remember { mutableStateOf(0) }
+    val eventDates = events.map { it.start.toLocalDate() }.toSet()
+
     Column(modifier = modifier) {
+        WeekNavigation(
+            currentWeekStart = currentWeekStart,
+            onNavigatePrevious = { currentWeekStart = currentWeekStart.minusWeeks(1) },
+            onNavigateNext = { currentWeekStart = currentWeekStart.plusWeeks(1) }
+        )
         ScheduleHeader(
-            minDate = minDate,
-            maxDate = maxDate,
+            currentWeekStart = currentWeekStart,
+            minDate = currentWeekStart,
+            maxDate = currentWeekStart.plusDays(6),
             dayWidth = dayWidth,
-            dayHeader = dayHeader,
+            dayHeader = { day: LocalDate, isHighlighted: Boolean ->
+                BasicDayHeader(day = day, isHighlighted = isHighlighted)
+            },
+            highlightedDates = eventDates,
             modifier = Modifier
                 .padding(start = with(LocalDensity.current) { sidebarWidth.toDp() })
                 .horizontalScroll(horizontalScrollState)
@@ -243,9 +253,13 @@ fun Schedule(
             )
             BasicSchedule(
                 events = events,
-                eventContent = eventContent,
-                minDate = minDate,
-                maxDate = maxDate,
+                currentWeekStart = currentWeekStart,
+                eventContent = { event ->
+                    BasicEvent(
+                        event = event,
+                        modifier = Modifier.clickable { selectedEvent = event }
+                    )
+                },
                 dayWidth = dayWidth,
                 hourHeight = hourHeight,
                 modifier = Modifier
@@ -255,11 +269,60 @@ fun Schedule(
             )
         }
     }
+    selectedEvent?.let { event ->
+        EventDetailsModal(event = event, onDismiss = { selectedEvent = null })
+    }
+}
+
+@Composable
+fun EventDetailsModal(event: Event, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable { onDismiss() }
+    ) {
+        Card(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(16.dp)
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row{
+                    Text(
+                        text = "Détails du trajet ",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text("${event.nameR}", style = MaterialTheme.typography.headlineMedium)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Destination : ${event.name}", style = MaterialTheme.typography.bodyLarge)
+                Text("Heure de départ conseillée: ${event.start.format(EventTimeFormatter)}")
+                Text("Heure du rendez-vous : ${event.end.format(EventTimeFormatter)}")
+                event.description?.let {
+                    Text(it)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { onDismiss() },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Fermer")
+                }
+            }
+        }
+    }
 }
 
 @Composable
 fun BasicSchedule(
     events: List<Event>,
+    currentWeekStart: LocalDate,
     modifier: Modifier = Modifier,
     eventContent: @Composable (event: Event) -> Unit = { BasicEvent(event = it) },
     minDate: LocalDate = events.minByOrNull(Event::start)!!.start.toLocalDate(),
@@ -267,13 +330,20 @@ fun BasicSchedule(
     dayWidth: Dp,
     hourHeight: Dp,
 ) {
+    val daysInWeek = (0..6).toList()
     val numDays = ChronoUnit.DAYS.between(minDate, maxDate).toInt() + 1
     val dividerColor = Color.LightGray
     Layout(
         content = {
-            events.sortedBy(Event::start).forEach { event ->
-                Box(modifier = Modifier.eventData(event)) {
-                    eventContent(event)
+            daysInWeek.forEach { offset ->
+                if (offset >= 7) return@forEach
+                val dayDate = currentWeekStart.plusDays(offset.toLong())
+                val eventsForDay = events.filter { it.start.toLocalDate() == dayDate }
+
+                eventsForDay.forEach { event ->
+                    Box(modifier = Modifier.eventData(event)) {
+                        eventContent(event)
+                    }
                 }
             }
         },
@@ -298,7 +368,7 @@ fun BasicSchedule(
             }
     ) { measureables, constraints ->
         val height = hourHeight.roundToPx() * 24
-        val width = dayWidth.roundToPx() * numDays
+        val width = dayWidth.roundToPx() * 7
         val placeablesWithEvents = measureables.map { measurable ->
             val event = measurable.parentData as Event
             val eventDurationMinutes = ChronoUnit.MINUTES.between(event.start, event.end)
@@ -310,10 +380,37 @@ fun BasicSchedule(
             placeablesWithEvents.forEach { (placeable, event) ->
                 val eventOffsetMinutes = ChronoUnit.MINUTES.between(LocalTime.MIN, event.start.toLocalTime())
                 val eventY = ((eventOffsetMinutes / 60f) * hourHeight.toPx()).roundToInt()
-                val eventOffsetDays = ChronoUnit.DAYS.between(minDate, event.start.toLocalDate()).toInt()
+                val eventOffsetDays = ChronoUnit.DAYS.between(currentWeekStart, event.start.toLocalDate()).toInt()
+                Log.d("Schedule", "Event Offset Days: $eventOffsetDays for Event: ${event.start}")
+                Log.d("Schedule", "Date minimum: $minDate")
                 val eventX = eventOffsetDays * dayWidth.roundToPx()
                 placeable.place(eventX, eventY)
             }
+        }
+    }
+}
+
+@Composable
+fun WeekNavigation(
+    currentWeekStart: LocalDate,
+    onNavigatePrevious: () -> Unit,
+    onNavigateNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onNavigatePrevious) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Semaine précédente")
+        }
+        Text(
+            text = "${currentWeekStart.format(DateTimeFormatter.ofPattern("MMM d"))} - ${currentWeekStart.plusDays(6).format(DateTimeFormatter.ofPattern("MMM d"))}",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        IconButton(onClick = onNavigateNext) {
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Semaine suivante")
         }
     }
 }
@@ -324,6 +421,7 @@ fun BasicSchedule(
 
 data class Event(
     val name: String,
+    val nameR: String?,
     val color: Color,
     val start: LocalDateTime,
     val end: LocalDateTime,

@@ -17,9 +17,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -42,6 +48,9 @@ fun HomeScreenPage(
     onRemoveRoute: (Route) -> Unit,
     context: Context
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
     LaunchedEffect(routes, selectedDate) {
         scheduleNotificationForRoutes(routes, selectedDate, context)
     }
@@ -51,17 +60,24 @@ fun HomeScreenPage(
         },
         bottomBar = {
             NavigationBar(selectedTab = 0) { }
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) {
         Box(modifier = modifier.padding(it)) {
-            HomeContent(routes, onRemoveRoute, context)
+            HomeContent(routes, onRemoveRoute, context, snackbarHostState, coroutineScope)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(routes: List<Route>, onRemoveRoute: (Route) -> Unit, context: Context) {
+fun HomeContent(
+    routes: List<Route>,
+    onRemoveRoute: (Route) -> Unit,
+    context: Context,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -115,7 +131,10 @@ fun HomeContent(routes: List<Route>, onRemoveRoute: (Route) -> Unit, context: Co
                             onViewDetails = { },
                             onDelete = {
                                 onRemoveRoute(route)
-                                cancelNotification(route, context) },
+                                cancelNotification(route, context)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Suppression de l'itinéraire réussie")
+                                } },
                             showDeleteIcon = true
                         )
                     }

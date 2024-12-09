@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,14 +29,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -45,6 +51,9 @@ fun ListItineraires(
     onViewDetails: (Route) -> Unit,
     onDelete: (Route) -> Unit,
     routes: List<Route>,
+    frequency: String?,
+    untilDate: String?,
+    name: String?,
     modifier: Modifier = Modifier)
 {
     var selectedRoute = remember { mutableStateOf<Route?>(null) }
@@ -101,7 +110,7 @@ fun ListItineraires(
             AppTopBar(title = "Itinéraires proposés")
         },
         bottomBar = {
-            NavigationBar(selectedTab = 4) { } // Menu de navigation
+            NavigationBar(selectedTab = 4) { }
         }
     ) { innerPadding ->
         Column(
@@ -109,62 +118,91 @@ fun ListItineraires(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            Row(
+            Text(
+                text = "Sélectionnez un itinéraire",
+                style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            /**
+             * DropDownMenu pour le tri des itinéraires
+             */
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "Sélectionnez un itinéraire",
-                    style = MaterialTheme.typography.headlineMedium
-                )
-
-                /**
-                 * DropDownMenu pour le tri des itinéraires
-                 */
-                Box {
-                    Button(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.width(150.dp)
+                val configuration = LocalConfiguration.current
+                val screenWidthDp = configuration.screenWidthDp.dp
+                Button(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = sortOption)
-                            Icon(
-                                painter = painterResource(id = android.R.drawable.arrow_down_float),
-                                contentDescription = "Icône menu déroulant"
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        sortOptions.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = {
-                                    sortOption = option
-                                    expanded = false
-                                }
-                            )
-                        }
+                        Text(
+                            text = sortOption,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.arrow_down_float),
+                            contentDescription = "Icône menu déroulant",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
                     }
                 }
-            }
 
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                ) {
+                    sortOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = option,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                   },
+                            onClick = {
+                                sortOption = option
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+        }
+            /**
+             * Liste des itinéraires
+             */
             LazyColumn {
                 items(sortedRoutes) { route ->
                     RouteCard(
-                        route = route,
+                        route = route.copy(name = name.orEmpty()),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        onViewDetails = onViewDetails,
+                        onViewDetails = { selectedRoute ->
+                            onViewDetails(
+                                selectedRoute.copy(
+                                    name = name.orEmpty(),
+                                    frequency = frequency,
+                                    untilDate = untilDate
+                                )
+                            )
+                        },
                         onDelete = onDelete
                     )
                 }
@@ -181,6 +219,7 @@ fun RouteCard(
     onDelete: (Route) -> Unit,
     showDeleteIcon: Boolean = false
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .padding(vertical = 8.dp)
@@ -195,6 +234,14 @@ fun RouteCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
+            if (!route.name.isNullOrBlank() && showDeleteIcon) {
+                Text(
+                    text = "Nom : ${route.name}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             Text(
                 text = "Itinéraire",
                 style = MaterialTheme.typography.headlineMedium,
@@ -202,35 +249,87 @@ fun RouteCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Transport information
-            RowInfo(label = "Départ :", value = "${route.startAddress}")
-            RowInfo(label = "Arrivée :", value = "${route.endAddress}")
-            RowInfo(label = "Distance :", value = "${route.distance}")
-            RowInfo(label = "Durée :", value = "${route.duration}")
-            Text(text = "${route.vehicleType} ${route.lineNumber}", style = MaterialTheme.typography.bodyMedium)
+            // Transport information for homepage
+            if(showDeleteIcon){
+                RowInfo(label = "Arrivée :", value = "${route.endAddress}")
+                Text(text = "${route.vehicleType} ${route.lineNumber}", style = MaterialTheme.typography.bodyMedium)
 
-            Spacer(modifier = Modifier.height(8.dp))
+                if(route.vehicleType == "Bus") { // Champs nécessaires qu'aux trajets en bus
+                    RowInfo(
+                        label = "Départ arrêt :",
+                        value = "${route.startStop} (${route.transportDepartTime})"
+                    )
+                }
 
-            if(route.vehicleType == "Bus") { // Champs nécessaires qu'aux trajets en bus
                 RowInfo(
-                    label = "Départ arrêt :",
-                    value = "${route.startStop} (${route.transportDepartTime})"
+                    label = "Rendez-vous à:",
+                    value = "${route.appointmentTime} le ${route.selectedDate}"
                 )
+                RowInfo(label = "Heure de départ conseillée :", value = "${route.userDepartureTime}")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if(isExpanded){
+                    RowInfo(label = "Départ :", value = "${route.startAddress}")
+                    RowInfo(label = "Distance :", value = "${route.distance}")
+                    RowInfo(label = "Durée :", value = "${route.duration}")
+                    if(route.vehicleType == "Bus"){
+                        RowInfo(
+                            label = "Arrivée arrêt :",
+                            value = "${route.endStop} (${route.transportArrivalTime})"
+                        )
+                        RowInfo(label = "Direction :", value = "${route.direction}")
+                        RowInfo(label = "Nombre d'arrêts :", value = "${route.nbStop}")
+                    }
+                }
+            }else{
+                RowInfo(label = "Départ :", value = "${route.startAddress}")
+                RowInfo(label = "Arrivée :", value = "${route.endAddress}")
+                RowInfo(label = "Distance :", value = "${route.distance}")
+                RowInfo(label = "Durée :", value = "${route.duration}")
+                Text(text = "${route.vehicleType} ${route.lineNumber}", style = MaterialTheme.typography.bodyMedium)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if(route.vehicleType == "Bus") {
+                    RowInfo(
+                        label = "Départ arrêt :",
+                        value = "${route.startStop} (${route.transportDepartTime})"
+                    )
+                    RowInfo(
+                        label = "Arrivée arrêt :",
+                        value = "${route.endStop} (${route.transportArrivalTime})"
+                    )
+                    RowInfo(label = "Direction :", value = "${route.direction}")
+                    RowInfo(label = "Nombre d'arrêts :", value = "${route.nbStop}")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 RowInfo(
-                    label = "Arrivée arrêt :",
-                    value = "${route.endStop} (${route.transportArrivalTime})"
+                    label = "Rendez-vous à:",
+                    value = "${route.appointmentTime} le ${route.selectedDate}"
                 )
-                RowInfo(label = "Direction :", value = "${route.direction}")
-                RowInfo(label = "Nombre d'arrêts :", value = "${route.nbStop}")
+                RowInfo(label = "Heure de départ conseillée :", value = "${route.userDepartureTime}")
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            RowInfo(
-                label = "Rendez-vous à:",
-                value = "${route.appointmentTime} le ${route.selectedDate}"
-            )
-            RowInfo(label = "Heure de départ conseillée :", value = "${route.userDepartureTime}")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (showDeleteIcon) {
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (isExpanded) R.drawable.baseline_keyboard_arrow_up_24 else R.drawable.baseline_keyboard_arrow_down_24
+                            ),
+                            contentDescription = if (isExpanded) "Réduire" else "Agrandir"
+                        )
+                    }
+                }
+            }
 
             // Afficher l'icone pour effacer l'itineraire seulement si il a été  ajouté
             if (showDeleteIcon) {
