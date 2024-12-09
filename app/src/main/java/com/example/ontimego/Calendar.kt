@@ -2,6 +2,7 @@ package com.example.ontimego
 
 import android.app.DatePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -16,11 +17,12 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 import java.util.*
 
 /**
- * Récupération de l'heure par l'utilisateur
+ * Récupération de la date par l'utilisateur
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,30 +50,82 @@ fun DatePicker() {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
         if (showCalendar) {
-            CalendarDialog(onDateSelected = { date ->
-                selectedDate = date
-                showCalendar = false
-            })
+            CalendarDialog(
+                onDateSelected = { date ->
+                    selectedDate = date
+                    showCalendar = false
+                },
+                onDismissRequest = {
+                    showCalendar = false
+                }
+            )
         }
-
-
     }
 }
 
 @Composable
-fun CalendarDialog(onDateSelected: (String) -> Unit) {
+fun CustomDatePickerDialog(
+    onDateSelected: (String) -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    var selectedDate by remember { mutableStateOf("") }
     val calendar = Calendar.getInstance()
     val year = calendar.get(Calendar.YEAR)
     val month = calendar.get(Calendar.MONTH)
     val day = calendar.get(Calendar.DAY_OF_MONTH)
+    val LightButtonColor = Color(0xFF296A48)
+    val DarkButtonColor = Color(0xFF92D5AB)
+    val buttonColor = if (isSystemInDarkTheme()) DarkButtonColor else LightButtonColor
 
-    DatePickerDialog(
-        LocalContext.current,
-        { _, selectedYear, selectedMonth, selectedDay ->
-            val date = "$selectedDay/${selectedMonth + 1}/$selectedYear" // Format de date
-            onDateSelected(date)
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(text = "Sélectionner une date")
         },
-        year, month, day
-    ).show()
+        text = {
+            Column {
+                AndroidView(
+                    factory = { context ->
+                        android.widget.DatePicker(context).apply {
+                            init(year, month, day) { _, selectedYear, selectedMonth, selectedDay ->
+                                selectedDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+                            }
+                        }
+                    },
+                    update = { view ->
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (selectedDate.isNotEmpty()) {
+                    onDateSelected(selectedDate)
+                }
+                onDismissRequest()
+            }) {
+                Text(text = "OK", color = buttonColor)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(text = "Annuler", color = buttonColor)
+            }
+        }
+    )
 }
+
+
+@Composable
+fun CalendarDialog(
+    onDateSelected: (String) -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    CustomDatePickerDialog(
+        onDateSelected = onDateSelected,
+        onDismissRequest = onDismissRequest
+    )
+}
+

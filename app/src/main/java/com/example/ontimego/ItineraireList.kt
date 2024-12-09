@@ -1,7 +1,9 @@
 package com.example.ontimego
 
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -28,6 +32,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -75,26 +80,26 @@ fun ListItineraires(
             }
             "Heure d'arrivée" -> routes.sortedBy { route ->
                 try {
-                    val arrivalTimeMatch = Regex("""\d{1,2}:\d{2}\s[AP]M""").find(route.transportArrivalTime)
-                    val rawArrivalTime = arrivalTimeMatch?.value
-                    if (rawArrivalTime != null) {
-                        val cleanedArrivalTime = rawArrivalTime.replace(" ", "").replace("\u202F", "").trim()
-                        val timeFormatAMPM = SimpleDateFormat("hh:mm a", Locale.US) // Forcer Locale.US
-                        val timeFormat24H = SimpleDateFormat("HH:mm", Locale.getDefault())
-                        val arrivalTime = timeFormatAMPM.parse(cleanedArrivalTime)?.time
-                        val appointmentTime = timeFormat24H.parse(route.appointmentTime)?.time
-                        if (arrivalTime != null && appointmentTime != null) {
-                            val waitingTime = Math.abs(appointmentTime - arrivalTime)
-                            println("Waiting Time (ms): $waitingTime")
-                            waitingTime
-                        } else {
-                            Long.MAX_VALUE
-                        }
+                    var cleanedArrivalTime = route.transportArrivalTime
+                        .replace("[^\\x20-\\x7E]".toRegex(), "")
+                        .replace(" ", "")
+                        .replace("\u202F", "")
+                        .replace("\u00A0", "")
+                        .trim()
+                    if (!cleanedArrivalTime.contains(" ")) {
+                        cleanedArrivalTime = cleanedArrivalTime.replace("AM", " AM").replace("PM", " PM")
+                    }
+                    val timeFormatAMPM = SimpleDateFormat("hh:mm a", Locale.US)
+                    val arrivalTime = timeFormatAMPM.parse(cleanedArrivalTime)?.time
+                    val timeFormat24H = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    val appointmentTime = timeFormat24H.parse(route.appointmentTime)?.time
+                    if (arrivalTime != null && appointmentTime != null) {
+                        val waitingTime = Math.abs(appointmentTime - arrivalTime)
+                        waitingTime
                     } else {
                         Long.MAX_VALUE
                     }
                 } catch (e: Exception) {
-                    println("Error parsing times for route: ${route.transportArrivalTime}")
                     Long.MAX_VALUE
                 }
             }
@@ -138,7 +143,10 @@ fun ListItineraires(
                 val screenWidthDp = configuration.screenWidthDp.dp
                 Button(
                     onClick = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSystemInDarkTheme()) Color(0xFF296A48) else Color(0xFFAEF2C6),
+                        contentColor = if (isSystemInDarkTheme()) Color(0xFFAEF2C6) else Color(0xFF296A48))
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -148,6 +156,7 @@ fun ListItineraires(
                         Text(
                             text = sortOption,
                             maxLines = 1,
+                            color = if (isSystemInDarkTheme()) Color.White else Color.Black,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f)
@@ -173,13 +182,18 @@ fun ListItineraires(
                                 Text(
                                     text = option,
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = if (isSystemInDarkTheme()) Color.White else Color.Black
                                 )
                                    },
                             onClick = {
                                 sortOption = option
                                 expanded = false
-                            }
+                            },
+                            modifier = Modifier
+                                .background(
+                                    if (isSystemInDarkTheme()) Color(0xFF296A48) else Color(0xFFAEF2C6)
+                                )
                         )
                     }
                 }
@@ -220,16 +234,17 @@ fun RouteCard(
     showDeleteIcon: Boolean = false
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color(0xFF1E1F25) else Color.White
+    val textColor = if (isDarkTheme) Color(0xFFE2E2E9) else Color.Black
     Card(
         modifier = Modifier
             .padding(vertical = 8.dp)
             .clickable {
                 onViewDetails(route)
             },
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -325,7 +340,8 @@ fun RouteCard(
                             painter = painterResource(
                                 id = if (isExpanded) R.drawable.baseline_keyboard_arrow_up_24 else R.drawable.baseline_keyboard_arrow_down_24
                             ),
-                            contentDescription = if (isExpanded) "Réduire" else "Agrandir"
+                            contentDescription = if (isExpanded) "Réduire" else "Agrandir",
+                            tint = textColor
                         )
                     }
                 }

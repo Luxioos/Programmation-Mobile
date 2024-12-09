@@ -40,18 +40,24 @@ import okhttp3.Request
 import org.json.JSONObject
 import android.Manifest
 import android.content.Context
+import android.widget.TimePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
@@ -59,6 +65,7 @@ import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -466,6 +473,11 @@ fun TripSetter(
     var hasInteractedWithAddress by remember { mutableStateOf(false) }
     val addressSuggestions = remember { mutableStateListOf<AddressSuggestion>() }
 
+    var departureAddress by remember { mutableStateOf("") }
+    var isDepartureAddressSelected by remember { mutableStateOf(false) }
+    var hasInteractedWithDepartureAddress by remember { mutableStateOf(false) }
+    val departureAddressSuggestions = remember { mutableStateListOf<AddressSuggestion>() }
+
     var selectedTime by remember {mutableStateOf("")}
     var showTime by remember {mutableStateOf(false)}
 
@@ -506,14 +518,33 @@ fun TripSetter(
     LaunchedEffect(selectedAdresse, hasInteractedWithAddress) {
         debounceJob?.cancel()
         debounceJob = launch {
-            delay(300) // limiter les appels API
+            delay(300)
             if (selectedAdresse.isNotBlank() && !isAddressSelected && hasInteractedWithAddress) {
-                fetchAddressSuggestions(selectedAdresse) { suggestions ->
-                    addressSuggestions.clear()
-                    addressSuggestions.addAll(suggestions)
+                locationManager.getCurrentLocation { latitude, longitude ->
+                    fetchAddressSuggestions(selectedAdresse, latitude, longitude) { suggestions ->
+                        addressSuggestions.clear()
+                        addressSuggestions.addAll(suggestions)
+                    }
                 }
             } else if (isAddressSelected) {
                 addressSuggestions.clear()
+            }
+        }
+    }
+
+    LaunchedEffect(departureAddress, hasInteractedWithDepartureAddress) {
+        debounceJob?.cancel()
+        debounceJob = launch {
+            delay(300)
+            if (departureAddress.isNotBlank() && !isDepartureAddressSelected && hasInteractedWithDepartureAddress) {
+                locationManager.getCurrentLocation { latitude, longitude ->
+                    fetchAddressSuggestions(departureAddress, latitude, longitude) { suggestions ->
+                        departureAddressSuggestions.clear()
+                        departureAddressSuggestions.addAll(suggestions)
+                    }
+                }
+            } else if (isDepartureAddressSelected) {
+                departureAddressSuggestions.clear()
             }
         }
     }
@@ -544,7 +575,13 @@ fun TripSetter(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Entrez un nom") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -558,7 +595,7 @@ fun TripSetter(
                 trailingIcon = {
                     IconButton(onClick = { showCalendar = true }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.calendar),
+                            painter = painterResource(id = R.drawable.baseline_calendar_month_24),
                             contentDescription = "Ouvrir le calendrier",
                         )
                     }
@@ -572,12 +609,19 @@ fun TripSetter(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+
             if (showCalendar) {
-                CalendarDialog(onDateSelected = { date ->
-                    selectedDate = date
-                    showCalendar = false
-                })
+                CalendarDialog(
+                    onDateSelected = { date ->
+                        selectedDate = date
+                        showCalendar = false
+                    },
+                    onDismissRequest = {
+                        showCalendar = false
+                    }
+                )
             }
+
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -661,7 +705,7 @@ fun TripSetter(
                             enabled = isUntilDateEnabled
                         ) {
                             Icon(
-                                painter = painterResource(id = R.drawable.calendar),
+                                painter = painterResource(id = R.drawable.baseline_calendar_month_24),
                                 contentDescription = "Sélectionner une date"
                             )
                         }
@@ -674,15 +718,76 @@ fun TripSetter(
                     )
                 )
                 if (showUntilDatePicker) {
-                    CalendarDialog(onDateSelected = { date ->
-                        untilDate = date
-                        showUntilDatePicker = false
-                        onUntilDateSelected(date)
-                    })
+                    CalendarDialog(
+                        onDateSelected = { date ->
+                            untilDate = date
+                            showUntilDatePicker = false
+                            onUntilDateSelected(date)
+                        },
+                        onDismissRequest = {
+                            showUntilDatePicker = false
+                        }
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            Text("Adresse de départ")
+            OutlinedTextField(
+                value = departureAddress,
+                onValueChange = { query ->
+                    departureAddress = query
+                    isDepartureAddressSelected = false
+                    hasInteractedWithDepartureAddress = true
+                },
+                label = { Text("Si laissé vide, localisation utilisée") },
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    if (departureAddress.isNotBlank()) {
+                        IconButton(onClick = {
+                            departureAddress = ""
+                            departureAddressSuggestions.clear()
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_clear_24),
+                                contentDescription = "Effacer l'adresse"
+                            )
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            if (departureAddressSuggestions.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                ) {
+                    items(departureAddressSuggestions) { suggestion ->
+                        Text(
+                            text = suggestion.description,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    departureAddress = suggestion.description
+                                    isDepartureAddressSelected = true
+                                    hasInteractedWithDepartureAddress = false
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             Text("Adresse de destination")
             OutlinedTextField(
                 value = selectedAdresse,
@@ -738,43 +843,35 @@ fun TripSetter(
 
             Spacer(modifier = Modifier.height(24.dp))
             Text("Heure")
-            OutlinedTextField(
-                value = selectedTime,
-                onValueChange = { selectedTime = it },
-                label = { Text("Heure") },
-                modifier = Modifier.fillMaxWidth(),
-                trailingIcon = {
-                    IconButton(onClick = { showTime = true }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.logo),
-                            contentDescription = "Ouvrir la sélection d'heure",
-                        )
-                    }
-                },
-                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        keyboardController?.hide()
-                    }
-                )
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            if (showTime) {
-                val calendar = Calendar.getInstance()
-                val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                val minute = calendar.get(Calendar.MINUTE)
-                TimePickerDialog(
-                    context,
-                    { _, selectedHour, selectedMinute ->
-                        selectedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
-                        showTime = false
+                OutlinedTextField(
+                    value = selectedTime,
+                    onValueChange = { selectedTime = it },
+                    label = { Text("Heure") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = { showTime = true }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_access_time_24),
+                                contentDescription = "Ouvrir la sélection d'heure",
+                            )
+                        }
                     },
-                    hour,
-                    minute,
-                    true  // format 24h
-                ).show()
-            }
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                        }
+                    )
+                )
+                if (showTime) {
+                    CustomTimePickerDialog(
+                        onTimeSelected = { time ->
+                            selectedTime = time
+                            showTime = false
+                        },
+                        onDismissRequest = { showTime = false }
+                    )
+                }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -824,13 +921,15 @@ fun TripSetter(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = {
+            CustomButtonStyle(
+                modifier = Modifier.padding(16.dp),
+                onClick = {
                 if (name.isNotBlank()) {
                     onNameSelected(name)
                 }
                 val missingFields = mutableListOf<String>()
                 if (selectedDate.isBlank()) missingFields.add("Date")
-                if (selectedAdresse.isBlank()) missingFields.add("Adresse")
+                if (selectedAdresse.isBlank()) missingFields.add("Adresse de destination")
                 if (selectedTime.isBlank()) missingFields.add("Heure")
                 if (name.isBlank()) missingFields.add("Nom")
                 if (missingFields.isNotEmpty()) {
@@ -843,63 +942,129 @@ fun TripSetter(
                         requestNotificationPermission()
                     } else {
                         isLoading = true
-                        locationManager.getCurrentLocation { originLat, originLng ->
-                            geocodeAddress(selectedAdresse) { destLat, destLng ->
-                                if (destLat != null && destLng != null) {
-                                    var mode: String
-                                    if (selectedTransport == "Voiture") mode = "driving"
-                                    else if (selectedTransport == "Marche") mode = "walking"
-                                    else if (selectedTransport == "Vélo") mode = "bicycling"
-                                    else mode = "transit"
-                                    val arrivalTime = convertToTimestamp(selectedDate, selectedTime)
-                                    getRoutes(
-                                        originLat,
-                                        originLng,
-                                        destLat,
-                                        destLng,
-                                        mode,
-                                        arrivalTime,
-                                        selectedTime,
-                                        arrivalTime,
-                                        selectedDate,
-                                        name = name
-                                    ) { routes ->
-                                        val uniqueRoutes = removeDuplicateRoutes(routes)
-                                        val enrichedRoutes = routes.map { route ->
-                                            route.copy(
-                                                appointmentTime = selectedTime,
-                                                name = name,
-                                                userDepartureTime = calculateDepartureTime(
-                                                    appointmentTime = selectedTime,
-                                                    durationInSeconds = parseDurationToSeconds(route.duration),
-                                                    isTransit = route.vehicleType == "Bus",
-                                                    arrivalTime = if (route.vehicleType == "Bus") route.transportArrivalTime else null
-                                                )
-                                            )
+                        if (departureAddress.isNotBlank() && isDepartureAddressSelected) {
+                            // Si une adresse de départ est renseignée et validée
+                            geocodeAddress(departureAddress) { originLat, originLng ->
+                                if (originLat != null && originLng != null) {
+                                    geocodeAddress(selectedAdresse) { destLat, destLng ->
+                                        if (destLat != null && destLng != null) {
+                                            var mode: String
+                                            mode = when (selectedTransport) {
+                                                "Voiture" -> "driving"
+                                                "Marche" -> "walking"
+                                                "Vélo" -> "bicycling"
+                                                else -> "transit"
+                                            }
+                                            val arrivalTime = convertToTimestamp(selectedDate, selectedTime)
+                                            getRoutes(
+                                                originLat,
+                                                originLng,
+                                                destLat,
+                                                destLng,
+                                                mode,
+                                                arrivalTime,
+                                                selectedTime,
+                                                arrivalTime,
+                                                selectedDate,
+                                                name
+                                            ) { routes ->
+                                                val uniqueRoutes = removeDuplicateRoutes(routes)
+                                                val enrichedRoutes = uniqueRoutes.map { route ->
+                                                    route.copy(
+                                                        appointmentTime = selectedTime,
+                                                        name = name,
+                                                        userDepartureTime = calculateDepartureTime(
+                                                            appointmentTime = selectedTime,
+                                                            durationInSeconds = parseDurationToSeconds(route.duration),
+                                                            isTransit = route.vehicleType == "Bus",
+                                                            arrivalTime = if (route.vehicleType == "Bus") route.transportArrivalTime else null
+                                                        )
+                                                    )
+                                                }
+                                                enrichedRoutes.forEach { route ->
+                                                    scheduleNotification(
+                                                        routeName = "${route.startAddress} → ${route.endAddress}",
+                                                        departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime),
+                                                        location = route.startAddress,
+                                                        context = context
+                                                    )
+                                                }
+                                                onRoutesFetched(enrichedRoutes, selectedDate)
+                                                isLoading = false
+                                            }
+                                        } else {
+                                            isLoading = false
+                                            errorMessage = "Adresse de destination introuvable."
                                         }
-                                        enrichedRoutes.forEach { route ->
-                                            //val departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime)
-                                            scheduleNotification(
-                                                routeName = "${route.startAddress} → ${route.endAddress}",
-                                                departureTimeMillis = convertToTimestamp(
-                                                    selectedDate,
-                                                    route.userDepartureTime
-                                                ),
-                                                location = route.startAddress,
-                                                context = context
-                                            )
-                                        }
-                                        onRoutesFetched(enrichedRoutes, selectedDate)
-                                        isLoading = false
                                     }
                                 } else {
                                     isLoading = false
+                                    errorMessage = "Adresse de départ introuvable."
+                                }
+                            }
+                        } else {
+                            // Si pas d'adresse de départ entrée
+                            locationManager.getCurrentLocation { originLat, originLng ->
+                                geocodeAddress(selectedAdresse) { destLat, destLng ->
+                                    if (destLat != null && destLng != null) {
+                                        var mode: String
+                                        if (selectedTransport == "Voiture") mode = "driving"
+                                        else if (selectedTransport == "Marche") mode = "walking"
+                                        else if (selectedTransport == "Vélo") mode = "bicycling"
+                                        else mode = "transit"
+                                        val arrivalTime =
+                                            convertToTimestamp(selectedDate, selectedTime)
+                                        getRoutes(
+                                            originLat,
+                                            originLng,
+                                            destLat,
+                                            destLng,
+                                            mode,
+                                            arrivalTime,
+                                            selectedTime,
+                                            arrivalTime,
+                                            selectedDate,
+                                            name = name
+                                        ) { routes ->
+                                            val uniqueRoutes = removeDuplicateRoutes(routes)
+                                            val enrichedRoutes = routes.map { route ->
+                                                route.copy(
+                                                    appointmentTime = selectedTime,
+                                                    name = name,
+                                                    userDepartureTime = calculateDepartureTime(
+                                                        appointmentTime = selectedTime,
+                                                        durationInSeconds = parseDurationToSeconds(
+                                                            route.duration
+                                                        ),
+                                                        isTransit = route.vehicleType == "Bus",
+                                                        arrivalTime = if (route.vehicleType == "Bus") route.transportArrivalTime else null
+                                                    )
+                                                )
+                                            }
+                                            enrichedRoutes.forEach { route ->
+                                                //val departureTimeMillis = convertToTimestamp(selectedDate, route.userDepartureTime)
+                                                scheduleNotification(
+                                                    routeName = "${route.startAddress} → ${route.endAddress}",
+                                                    departureTimeMillis = convertToTimestamp(
+                                                        selectedDate,
+                                                        route.userDepartureTime
+                                                    ),
+                                                    location = route.startAddress,
+                                                    context = context
+                                                )
+                                            }
+                                            onRoutesFetched(enrichedRoutes, selectedDate)
+                                            isLoading = false
+                                        }
+                                    } else {
+                                        isLoading = false
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }) { Text(text = "Voir les trajets") }
+            },  text = "Voir les trajets")
         }
     }
     if (isLoading) {
@@ -1090,6 +1255,77 @@ fun isDateTimeValid(selectedDate: String, selectedTime: String): Boolean {
         }
     } catch (e: Exception) {
         false
+    }
+}
+
+@Composable
+fun CustomTimePickerDialog(
+    onTimeSelected: (String) -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    val calendar = Calendar.getInstance()
+    var selectedHour by remember { mutableStateOf(calendar.get(Calendar.HOUR_OF_DAY)) }
+    var selectedMinute by remember { mutableStateOf(calendar.get(Calendar.MINUTE)) }
+
+    val buttonColor = if (isSystemInDarkTheme()) Color(0xFF92D5AB) else Color(0xFF296A48)
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(text = "Sélectionner une heure")
+        },
+        text = {
+            AndroidView(
+                factory = { context ->
+                    TimePicker(context).apply {
+                        setIs24HourView(true)
+                        hour = selectedHour
+                        minute = selectedMinute
+                        setOnTimeChangedListener { _, hour, minute ->
+                            selectedHour = hour
+                            selectedMinute = minute
+                        }
+                    }
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
+                    onTimeSelected(formattedTime)
+                    onDismissRequest()
+                }
+            ) {
+                Text(text = "OK", color = buttonColor)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(text = "Annuler", color = buttonColor)
+            }
+        }
+    )
+}
+
+@Composable
+fun CustomButtonStyle(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    text: String
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val containerColor = if (isDarkTheme) Color(0xFF003920) else Color(0xFFAEF2C6)
+    val contentColor = if (isDarkTheme) Color(0xFF92D5AB) else Color(0xFF002111)
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        modifier = modifier
+    ) {
+        Text(text = text)
     }
 }
 

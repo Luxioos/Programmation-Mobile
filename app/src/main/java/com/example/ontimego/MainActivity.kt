@@ -4,9 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.icu.text.SimpleDateFormat
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +40,7 @@ class MainActivity : ComponentActivity() {
     private var untilDate = mutableStateOf<String?>(null)
     private var name = mutableStateOf<String?>("")
 
+    @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("UnrememberedMutableState")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,9 +114,11 @@ class MainActivity : ComponentActivity() {
                             sharedPreferences.edit()
                                 .putString("USER_NAME", name)
                                 .putString("TRANSPORT_MODE", mode)
+                                .putString("userAddress", address)
                                 .apply()
                             userName = name
                             transportMode = mode
+                            userAddress = address
                         },
                         selectedFrequency = selectedFrequency,
                         untilDate = untilDate,

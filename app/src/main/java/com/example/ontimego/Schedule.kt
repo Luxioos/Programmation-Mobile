@@ -25,6 +25,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -127,10 +128,14 @@ fun BasicDayHeader(
     isHighlighted: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val textColor = if (isHighlighted) MaterialTheme.colorScheme.primary else {
+        if (isDarkTheme) MaterialTheme.colorScheme.onSurface else Color.Black
+    }
     Text(
         text = day.format(DayFormatter),
         textAlign = TextAlign.Center,
-        color = if (isHighlighted) MaterialTheme.colorScheme.primary else Color.Black,
+        color = if (isHighlighted) MaterialTheme.colorScheme.primary else textColor,
         modifier = modifier
             .fillMaxWidth()
             .padding(4.dp)
@@ -206,14 +211,20 @@ fun Schedule(
     val events = routes.map { route ->
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.getDefault())
         val currentDate = route.selectedDate
-        val startTime = LocalDateTime.parse("$currentDate ${route.userDepartureTime}", formatter)
-        val endTime = LocalDateTime.parse("$currentDate ${route.appointmentTime}", formatter)
+        val startTime = parseDateTime(route.selectedDate, route.userDepartureTime)
+        val endTime = parseDateTime(route.selectedDate, route.appointmentTime)
+
+        if (startTime == null || endTime == null) {
+            throw IllegalArgumentException("Impossible de parser la date ou l'heure pour le trajet : $route")
+        }
+
         Event(
             name = route.endAddress,
             nameR = route.name,
             color = Color(0xFFAFBBF2),
             start = startTime,
             end = endTime,
+            depart = route.startAddress,
             description = "Moyen de transport : ${route.vehicleType} ${route.lineNumber}"
         )
     }
@@ -295,22 +306,28 @@ fun EventDetailsModal(event: Event, onDismiss: () -> Unit) {
                 Row{
                     Text(
                         text = "Détails du trajet ",
+                        color = Color.Black,
                         style = MaterialTheme.typography.headlineMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    Text("${event.nameR}", style = MaterialTheme.typography.headlineMedium)
+                    Text("${event.nameR}", style = MaterialTheme.typography.headlineMedium, color = Color.Black)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Destination : ${event.name}", style = MaterialTheme.typography.bodyLarge)
-                Text("Heure de départ conseillée: ${event.start.format(EventTimeFormatter)}")
-                Text("Heure du rendez-vous : ${event.end.format(EventTimeFormatter)}")
+                Text("Départ : ${event.depart}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+                Text("Destination : ${event.name}", style = MaterialTheme.typography.bodyLarge, color = Color.Black)
+                Text("Heure de départ conseillée: ${event.start.format(EventTimeFormatter)}",color = Color.Black)
+                Text("Heure du rendez-vous : ${event.end.format(EventTimeFormatter)}",color = Color.Black)
                 event.description?.let {
-                    Text(it)
+                    Text(it, color = Color.Black)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { onDismiss() },
-                    modifier = Modifier.align(Alignment.End)
+                    modifier = Modifier.align(Alignment.End),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSystemInDarkTheme()) Color(0xFF296A48) else Color(0xFFAEF2C6),
+                        contentColor = if (isSystemInDarkTheme()) Color(0xFFAEF2C6) else Color(0xFF296A48)
+                    )
                 ) {
                     Text("Fermer")
                 }
@@ -421,6 +438,7 @@ fun WeekNavigation(
 
 data class Event(
     val name: String,
+    val depart: String,
     val nameR: String?,
     val color: Color,
     val start: LocalDateTime,
@@ -468,6 +486,19 @@ fun convertDurationStringToTimestamp(duration: String): Long {
 
     return totalMillis
 }
+fun parseDateTime(date: String, time: String): LocalDateTime? {
+    return try {
+        val normalizedDate = date.split("/").joinToString("/") { it.padStart(2, '0') }
+        val normalizedTime = time.split(":").joinToString(":") { it.padStart(2, '0') }
+        val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.getDefault())
+        LocalDateTime.parse("$normalizedDate $normalizedTime", formatter)
+    } catch (e: Exception) {
+        println("Erreur de parsing pour la date : $date et l'heure : $time -> ${e.message}")
+        null
+    }
+}
+
+
 
 
 

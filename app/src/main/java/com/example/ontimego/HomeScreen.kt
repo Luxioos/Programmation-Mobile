@@ -118,6 +118,7 @@ fun HomeContent(
                     ) {
                         Text(
                             text = "Vous n'avez aucun trajet de prévu",
+                            color = Color.Black,
                             fontSize = 14.sp
                         )
                     }
