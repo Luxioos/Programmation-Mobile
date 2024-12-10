@@ -921,6 +921,7 @@ fun TripSetter(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // lancement de la recherche des itinéraires
             CustomButtonStyle(
                 modifier = Modifier.padding(16.dp),
                 onClick = {

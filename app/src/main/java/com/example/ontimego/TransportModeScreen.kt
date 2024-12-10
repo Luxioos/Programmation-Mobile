@@ -1,11 +1,13 @@
 package com.example.ontimego
 
 import android.content.Context.MODE_PRIVATE
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.GlobalScope
@@ -18,6 +20,7 @@ import kotlinx.coroutines.launch
 fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
     var selectedMode by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
 
     Column(
         modifier = Modifier
@@ -25,17 +28,22 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(text = "Salut $userName ! Comment te déplaces-tu le plus souvent ?")
+        Text(text = "Salut $userName ! Comment te déplaces-tu le plus souvent ?", color = textColor)
 
         val transportModes = listOf("Voiture", "Bus", "Métro", "Pied", "Vélo")
         transportModes.forEach { mode ->
             Row {
                 RadioButton(
                     selected = (selectedMode == mode),
-                    onClick = { selectedMode = mode }
+                    onClick = { selectedMode = mode },
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = Color.Blue,
+                        unselectedColor = if (isSystemInDarkTheme()) Color.White else Color.DarkGray
+                    )
                 )
                 Text(
                     text = mode,
+                    color = textColor,
                     modifier = Modifier.align(Alignment.CenterVertically))
             }
         }
@@ -52,7 +60,10 @@ fun TransportModeScreen(userName: String ,onNext: (String) -> Unit) {
                     onNext(selectedMode)
                 }
             },
-            enabled = selectedMode.isNotBlank()
+            enabled = selectedMode.isNotBlank(),
+            colors = ButtonDefaults.buttonColors(
+                contentColor = if (isSystemInDarkTheme()) Color.Black else Color.White
+            )
         ) {
             Text("Suivant")
         }

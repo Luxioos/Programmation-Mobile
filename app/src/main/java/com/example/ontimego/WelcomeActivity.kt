@@ -1,9 +1,11 @@
 package com.example.ontimego
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.*
 import com.example.ontimego.ui.theme.OnTimeGoTheme
 
@@ -12,6 +14,7 @@ import com.example.ontimego.ui.theme.OnTimeGoTheme
  * Si les infos ont déjà été entrées alors l'utilisateur ne passe plus par là
  */
 class WelcomeActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

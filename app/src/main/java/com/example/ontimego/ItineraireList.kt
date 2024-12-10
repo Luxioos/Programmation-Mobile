@@ -50,6 +50,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+/**
+ * Liste des itinéraires récupérés à afficher et sélectionnables
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListItineraires(
@@ -225,6 +228,9 @@ fun ListItineraires(
     }
 }
 
+/**
+ * Format et contenu d'une "carte" d'itinéraire
+ */
 @Composable
 fun RouteCard(
     route: Route,

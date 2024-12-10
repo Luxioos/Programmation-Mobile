@@ -1,14 +1,11 @@
 package com.example.ontimego
 
 import android.content.SharedPreferences
-import androidx.compose.foundation.clickable
+import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -16,12 +13,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
 
-
+/**
+ *  Fonction pour voir les détails sur un itinéraire sélectionné
+ */
 @Composable
 fun ItineraireDetails(
     modifier: Modifier = Modifier,
@@ -34,6 +35,7 @@ fun ItineraireDetails(
     sharedPreferences: SharedPreferences,
     locationManager: LocationManager
 ) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             AppTopBar(title = "Itinéraires proposés")
@@ -44,6 +46,19 @@ fun ItineraireDetails(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    val departureTime = formatter.parse(selectedRoute.userDepartureTime)
+                    val appointmentTime = formatter.parse(selectedRoute.appointmentTime)
+                    if (departureTime != null && appointmentTime != null && departureTime.after(appointmentTime)) {
+                        // Affiche un message d'erreur si l'heure de départ est après l'heure de rendez-vous, bus pas disponibles
+                        Toast.makeText(
+                            context,
+                            "Bus pas disponibles à cette heure-ci",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@FloatingActionButton
+                    }
+
                     if (frequency == "Unique") {
                         onAddRoute(selectedRoute)
                         onScreenChange(0)
@@ -85,6 +100,9 @@ fun ItineraireDetails(
     }
 }
 
+/**
+ *  Générer les autres routes selon la fréquence entrée
+ */
 fun generateAdditionalRoutes(
     selectedRoute: Route,
     frequency: String,

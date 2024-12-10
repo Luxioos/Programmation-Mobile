@@ -1,12 +1,14 @@
 package com.example.ontimego
 
 import android.content.Context.MODE_PRIVATE
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
@@ -29,12 +31,15 @@ fun WelcomeScreen(onNext: (String) -> Unit) {
             .padding(16.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "Bienvenue sur OnTimeGO ! Votre nom ?")
+        Text(text = "Bienvenue sur OnTimeGO ! Votre nom ?", color = if (isSystemInDarkTheme()) Color.White else Color.Black)
         OutlinedTextField(
             value = userName,
             onValueChange = { userName = it },
-            label = { Text("Nom") },
+            label = { Text("Nom", color = if (isSystemInDarkTheme()) Color.White else Color.Black) },
             modifier = Modifier.fillMaxWidth(),
+            textStyle = LocalTextStyle.current.copy(
+                color = if (isSystemInDarkTheme()) Color.White else Color.Black
+            ),
             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
                 onDone = {

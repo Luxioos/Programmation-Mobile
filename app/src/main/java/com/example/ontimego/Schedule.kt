@@ -285,6 +285,9 @@ fun Schedule(
     }
 }
 
+/**
+ * Fenêtre de détails lors du clic sur un itinéraire dans le calendrier
+ */
 @Composable
 fun EventDetailsModal(event: Event, onDismiss: () -> Unit) {
     Box(
@@ -407,6 +410,9 @@ fun BasicSchedule(
     }
 }
 
+/**
+ * Navigation dans l'affichage des semaines de gauche a droite
+ */
 @Composable
 fun WeekNavigation(
     currentWeekStart: LocalDate,
@@ -486,6 +492,7 @@ fun convertDurationStringToTimestamp(duration: String): Long {
 
     return totalMillis
 }
+
 fun parseDateTime(date: String, time: String): LocalDateTime? {
     return try {
         val normalizedDate = date.split("/").joinToString("/") { it.padStart(2, '0') }

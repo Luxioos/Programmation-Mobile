@@ -16,10 +16,17 @@ import com.example.ontimego.ui.theme.OnTimeGoTheme
 import androidx.compose.foundation.Image
 import kotlinx.coroutines.*
 
+/**
+ * Page avec le logo affichée à tout lancement de l'application
+ */
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        setContent {
+            SplashScreen()
+        }
 
         val sharedPreferences = getSharedPreferences("OnTimeGoPrefs", MODE_PRIVATE)
         val userName = sharedPreferences.getString("USER_NAME", null)
@@ -30,23 +37,20 @@ class SplashActivity : ComponentActivity() {
         } else {
             MainActivity::class.java
         }
+        val allPrefs = sharedPreferences.all
+        println("SharedPreferences au démarrage : $allPrefs")
 
-        startActivity(Intent(this, nextActivity))
-        finish()
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(2000)
+            startActivity(Intent(this@SplashActivity, nextActivity))
+            finish()
+        }
     }
 
     @Composable
     fun SplashScreen() {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Image(painter = painterResource(R.drawable.logo), contentDescription = "Logo")
-        }
-    }
-
-    @Preview
-    @Composable
-    fun SplashScreenPreview() {
-        OnTimeGoTheme {
-            SplashScreen()
         }
     }
 }

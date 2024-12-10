@@ -40,6 +40,9 @@ import org.json.JSONObject
 import java.io.IOException
 import android.Manifest
 
+/**
+ * Page des paramètres
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -322,7 +325,6 @@ fun SettingsScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             text = "Sauvegarder")
-
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)

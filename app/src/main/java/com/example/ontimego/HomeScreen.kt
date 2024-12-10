@@ -39,6 +39,9 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
+/**
+ *  Architecture principale de la page d'accueil
+ */
 @Composable
 fun HomeScreenPage(
     modifier: Modifier = Modifier,
@@ -69,6 +72,9 @@ fun HomeScreenPage(
     }
 }
 
+/**
+ * Contenu de la page d'accueil
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeContent(
